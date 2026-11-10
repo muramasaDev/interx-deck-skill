@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+node_modules/
+*.tgz
+npm-debug.log*
+
+# 설치본 표지, 빌드 산출물
+.installed-by-npm
+*.pptx
+!assets/interx_template.pptx
+*.pdf
+
+# OS, 편집기
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
