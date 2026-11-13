@@ -42,7 +42,7 @@ TBL_HEAD = "AEAEAE"    # 표 머리칸
 BLUE = "0035D5"        # AAS 칩 (SM, SMC, SML)
 BLUE_L = "A8BEE2"      # Ent 칩
 GREEN = "13C690"       # EAC 표시, ISH 연결
-ORANGE = "EA580B"      # 회사 주황: 목차 번호, 차트 계열 하나
+ORANGE = "EA580B"      # 회사 주황: 목차 번호만
 ACCENT = NAVY          # 강조: 번호 원, 이름표, 지금 단계, 핵심 행과 수치, 주 흐름
 RED = "FF0000"
 TEAL = "299288"        # 패널 소제목, 점선
@@ -347,12 +347,12 @@ def summary(s, t):
 
 
 def notes(s, x, y, w, lines, size=7.26, bold=False):
-    """'→' 결론 줄"""
-    return text(s, x, y, w, _notes_h(lines, w, size), ["→ " + l for l in lines], size=size, bold=bold)
+    """'※' 메모 줄"""
+    return text(s, x, y, w, _notes_h(lines, w, size), ["※ " + l for l in lines], size=size, bold=bold)
 
 
 def _notes_h(lines, w, size):
-    n = sum(max(1, math.ceil(_text_w("→ " + l, size) / w)) for l in lines)
+    n = sum(max(1, math.ceil(_text_w("※ " + l, size) / w)) for l in lines)
     return max(0.15, size * 1.3 / 72) * n + 0.05
 
 
@@ -721,7 +721,31 @@ DOC_TOP, DOC_BOTTOM = 2.21, min(6.81, REPORT_BOTTOM)
 # --- 범용 장 부품
 LINE_L = "D9D9D9"      # 표 칸선, 카드 테두리, 눈금선
 ROW_BG = "F2F2F2"      # 목록 행 바탕
-PALETTE = (SLATE6, BLUE, ORANGE, GREEN, GRAY)
+PALETTE = (NAVY, SLATE6, TEAL, GRAY, SLATE4)   # 차트 계열 색, 주황 없음
+
+
+def mpl_style():
+    """matplotlib 그림을 덱 색 및 글꼴로"""
+    import matplotlib as mpl
+    from cycler import cycler
+    from matplotlib import font_manager as fm
+    # 가변 글꼴만 있으면 가장 가는 굵기로 그려져 OS 한글 글꼴로
+    ok = any(f.name == FONT and f.weight in (400, "normal", "regular") for f in fm.fontManager.ttflist)
+    have = {f.name for f in fm.fontManager.ttflist}
+    fam = [FONT] if ok else [n for n in ("Malgun Gothic", "Apple SD Gothic Neo", "AppleGothic") if n in have] or [FONT]
+    mpl.rcParams.update({"axes.prop_cycle": cycler(color=["#" + c for c in PALETTE]), "font.family": fam,
+                         "axes.unicode_minus": False, "axes.spines.top": False, "axes.spines.right": False,
+                         "axes.edgecolor": "#" + GRAY, "axes.grid": True, "axes.axisbelow": True,
+                         "grid.color": "#E5E7EB", "grid.linewidth": 0.6, "figure.dpi": 200})
+
+
+def _default_mpl(path):
+    """matplotlib 기본 주황, 파랑 칸이 그림의 0.5% 넘음"""
+    from PIL import Image as _Im
+    with _Im.open(path) as im:
+        px = im.convert("RGB").resize((200, 200), _Im.NEAREST).getdata()
+    hits = sum(1 for p in px if p in ((255, 127, 14), (31, 119, 180)))
+    return hits > len(px) * 0.005
 
 
 def card(s, x, y, w, h, title=None, title_color=BLUE):
@@ -1071,7 +1095,7 @@ def banner(s, t, tags=None, current=None, y=REPORT_TOP, x=None, w=None, h=0.4):
     return y + h + 0.12
 
 
-def report_panels(s, titles, widths=None, arrows=True, hub_gap=None, steps=None, top=REPORT_TOP, footnote=None):
+def report_panels(s, titles, widths=None, arrows=False, hub_gap=None, steps=None, top=REPORT_TOP, footnote=None):
     """보고형 패널과 칸 (Col) 목록"""
     n = len(titles)
     if n == 0:
@@ -1471,6 +1495,8 @@ class Col:
         with _Im.open(path) as im:
             iw, ih = im.size
         real = min(h, self.w * ih / iw)
+        if _default_mpl(path):
+            _warn(self.s, f"그림 {os.path.basename(path)} 이 matplotlib 기본 색 (주황, 파랑): 그리기 전 mpl_style()")
         pad = 0.12 if marks else 0.0  # 번호 원이 그림 위로 0.17 in 나옴
         return self._add(real + pad, lambda y, r: screenshot(self.s, path, self.x, y + pad, self.w, real, marks))
 
@@ -1500,6 +1526,7 @@ class Col:
             text(self.s, self.x + 0.16, y + 0.25, w, U - 0.2, ["• " + ln for ln in lines], size=8, color=BLACK)
             return body
         _reg(self.s).setdefault("list_titles", []).append(label)
+        _reg(self.s).setdefault("tab_labels", []).append(label)
         return self._add(lambda: 0.11 + _unit_of(self.s, "tab_box"), draw)
 
     def num_cards(self, items, color=ACCENT):
@@ -2055,7 +2082,7 @@ def _flush(s):
     todo.sort(key=lambda it: {"note": 1, "text": 2}.get(it[0], 0))
     for kind, where, t, n, color, cond in todo:
         if kind == "note":
-            nw = max([_text_w(t, 7.26) * 1.05] + [_text_w("→ " + l, 6.35) for l in n]) + 0.1
+            nw = max([_text_w(t, 7.26) * 1.05] + [_text_w("※ " + l, 6.35) for l in n]) + 0.1
             nh = 0.15 + 0.13 * len(n) + 0.03
             rows_ = R.get("rows", [])
 
@@ -2084,7 +2111,7 @@ def _flush(s):
             _obst(s, text(s, sp[0], sp[1], nw, 0.15, t, size=7.26, bold=True, color=color))
             R.setdefault("rows", []).append((sp[0], sp[0] + nw, sp[1] + 0.075))
             if n:
-                _obst(s, text(s, sp[0], sp[1] + 0.16, nw, 0.13 * len(n) + 0.02, ["→ " + l for l in n], size=6.35,
+                _obst(s, text(s, sp[0], sp[1] + 0.16, nw, 0.13 * len(n) + 0.02, ["※ " + l for l in n], size=6.35,
                               color=SLATE9))
             continue
         is_step = kind in ("step", "boxstep")
@@ -2630,6 +2657,13 @@ class Deck:
             if _reg(sl).get("kpi_rows", 0) > 1 or _reg(sl).get("kpi_items", 0) > 4:
                 problems.append(f"본문 {i}장: 핵심 수치 줄 {_reg(sl).get('kpi_rows', 0)}개, 수치 {_reg(sl).get('kpi_items', 0)}개 "
                                 "(한 장에 한 줄, 4개까지)")
+        seen = {}
+        for i, sl in enumerate(body, 1):
+            for t in set(_reg(sl).get("tab_labels", [])):
+                seen.setdefault(t, []).append(i)
+        for t, at in seen.items():
+            if len(at) >= 3:   # 장마다 같은 이름표는 틀로 찍은 느낌
+                problems.append(f"이름표 '{t}' 가 본문 {len(at)}장에 되풀이 ({at}): 장마다 내용을 담은 명사로")
         if len(kpi_slides) > max(1, len(body) // 5):
             problems.append(f"핵심 수치 줄을 쓴 본문 장 {len(kpi_slides)}장 (본문 {len(body)}장의 1/5 인 "
                             f"{max(1, len(body) // 5)}장까지): 숫자가 메시지인 장에만")

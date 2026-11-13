@@ -30,7 +30,7 @@ const pad = (s, n) => s + " ".repeat(Math.max(0, n - width(s)));
 const grad = (s, a, b) => [...s].map((ch, i, all) => rgb(mix(a, b, i / Math.max(1, all.length - 1)), "1;")(ch)).join("");
 
 // 村正: 도는 카타나 (반 칸 블록, 정사각 픽셀)
-const R = 18;                  // 회전 반지름 (픽셀)
+const R = 21;                  // 회전 반지름 (픽셀)
 const N = 2 * R + 1;           // 그림 한 변: N 칸, N/2 줄
 const W = 46;                  // 정보 카드 폭
 const STEEL = [150, 162, 178];
@@ -41,20 +41,20 @@ const SAME = [196, 186, 160];  // 손잡이 상어 가죽
 const RED = [200, 30, 40];
 
 // 칼 좌표 (u 칼 방향, v 수직)의 색, 없으면 null
-// - 칼끝 u=15, 손잡이 끝 u=-15
+// - 칼끝 u=15, 손잡이 끝 u=-11 (날 약 2.6배)
 function part(u, v, glint) {
-  if (u >= -4 && u <= 15) {                     // 칼날, 휨(소리)과 칼끝 좁힘
-    const vb = v - 1.4 * ((u + 4) / 19) ** 2;
-    const half = u > 12 ? 1.2 * (15 - u) / 3 : 1.2;
+  if (u >= -2.5 && u <= 15) {                   // 칼날, 휨(소리)과 칼끝 좁힘
+    const vb = v - 1.5 * ((u + 2.5) / 17.5) ** 2;
+    const half = u > 12.5 ? 1.15 * (15 - u) / 2.5 : 1.15;
     if (Math.abs(vb) > half) return null;
     if (Math.abs(u - glint) < 1.2) return [255, 255, 255];
     return vb < 0 ? EDGE : STEEL;
   }
-  if (u >= -4.9 && u < -4) return Math.abs(v) <= 1.4 ? GOLD : null;          // 하바키
-  if (u >= -6 && u < -4.9) return Math.abs(v) <= 3.2 ? [92, 74, 36] : null;  // 츠바
-  if (u >= -15 && u < -6) {                     // 손잡이, 마름모 무늬
-    if (Math.abs(v) > 1.4) return null;
-    if (u < -14.2) return GOLD;                 // 카시라
+  if (u >= -3.3 && u < -2.5) return Math.abs(v) <= 1.4 ? GOLD : null;        // 하바키
+  if (u >= -4.3 && u < -3.3) return Math.abs(v) <= 3 ? [92, 74, 36] : null;  // 츠바
+  if (u >= -11 && u < -4.3) {                   // 손잡이, 마름모 무늬
+    if (Math.abs(v) > 1.35) return null;
+    if (u < -10.3) return GOLD;                 // 카시라
     return Math.abs(((u * 1.2) % 2 + 2) % 2 - 1) > Math.abs(v) / 1.6 ? ITO : SAME;
   }
   return null;
@@ -88,7 +88,7 @@ function banner() {
   if (COLOR) process.stdout.write("\x1b[?25l"); // 커서 숨김
   for (let i = 1; i <= steps; i++) {
     const t = i / steps, ease = 1 - (1 - t) ** 3;
-    const lines = frame(end - 4 * Math.PI * (1 - ease), -6 + 24 * t);
+    const lines = frame(end - 4 * Math.PI * (1 - ease), -3 + 21 * t);
     if (i < steps) process.stdout.write(lines.join("\n") + `\n\x1b[${lines.length}A`);
     else process.stdout.write((COLOR ? "\x1b[J" : "") + lines.filter((l) => l.trim()).join("\n") + "\n\n");  // 빈 줄 제거
     sleep(28);

@@ -69,7 +69,7 @@ a.gantt(["1월", "2월", "3월", "4월", "5월", "6월"],
 a.done()
 
 s = d.page("진행 방법 (예시)", lead="단계마다 입력, 방법, 확인을 목록으로 둠")
-a, b, c = cols = report_panels(s, ["입력", "방법", "확인"])
+a, b, c = cols = report_panels(s, ["입력", "방법", "확인"], arrows=True)   # 순서가 있을 때만 화살표
 (a.section("받는 자료", ["장 구성", "장마다 할 말 한 줄", "근거 자료 경로"], row_h=0.38)
   .section("먼저 묻는 것", ["작성자 정보"], row_h=0.38, highlight=(0,))
   .rule_list("자료 기준", [("doc_check", "원천 명칭 그대로"), ("checklist_green", "확인한 사실만")])

@@ -260,9 +260,13 @@ def shape_of(sl):
             any(s.shape_type == 13 for s in sh), sum(1 for s in sh if s._element.tag.endswith("}cxnSp")) > 1)
 
 
-tables = sum(1 for sl in body if any(s.has_table for s in sl.shapes))
-if len(body) >= 4 and tables > len(body) * 0.35:
-    print(f"주의: 표가 있는 본문 장 {tables}/{len(body)} (35% 넘음). 규칙과 이유는 글, 관계는 그림으로")
+main = [sl for sl in body if not any(ph.placeholder_format.idx == 10 and ph.has_text_frame and
+                                       re.search(r"Appendix|부록", ph.text_frame.text) for ph in sl.placeholders)]
+tables = sum(1 for sl in main if any(s.has_table for s in sl.shapes))   # 부록 장은 셈에서 뺌
+if len(main) >= 4 and tables > len(main) * 0.5:
+    bad.append(f"표가 있는 본문 장 {tables}/{len(main)} (절반 넘음). 명세 표는 부록으로, 본문은 그림과 글로")
+elif len(main) >= 4 and tables > len(main) * 0.35:
+    print(f"주의: 표가 있는 본문 장 {tables}/{len(main)} (35% 넘음). 규칙과 이유는 글, 관계는 그림으로")
 kinds = [shape_of(sl) for sl in body]
 for k in range(len(kinds) - 2):
     if kinds[k] == kinds[k + 1] == kinds[k + 2]:
