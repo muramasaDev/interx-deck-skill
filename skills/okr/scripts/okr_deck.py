@@ -130,7 +130,7 @@ def _first_run(p):
 
 
 def _ensure_run(p):
-    """첫 런. 빈 문단이면 endParaRPr 로 만든다"""
+    """첫 런, 빈 문단이면 endParaRPr 로 생성"""
     r = _first_run(p)
     if r is None:
         r = etree.Element(A("r"))
@@ -156,7 +156,7 @@ def _set_para_text(p, text):
 
 
 def set_cell_text(cell, text):
-    """첫 런 서식을 살려 한 줄 셀을 고친다"""
+    """첫 런 서식 유지, 한 줄 셀 수정"""
     tb = cell._tc.txBody
     paras = tb.findall(A("p"))
     for extra in paras[1:]:
@@ -165,7 +165,7 @@ def set_cell_text(cell, text):
 
 
 def set_cell_lines(cell, lines):
-    """첫 문단을 복제해 여러 줄 셀을 쓴다"""
+    """첫 문단 복제, 여러 줄 셀 작성"""
     tb = cell._tc.txBody
     paras = tb.findall(A("p"))
     src = copy.deepcopy(paras[0])
@@ -196,7 +196,7 @@ def _para_from(src, texts):
 
 
 def write_lines(cell, lines, ex):
-    """Plan, Review 칸에 줄 목록을 쓴다"""
+    """Plan, Review 칸에 줄 목록 작성"""
     if not ex["paras"]:
         sys.exit("템플릿에 서식을 본뜰 문단이 없습니다 (Plan, Review 칸이 비어 있음). 번들 템플릿이나 직전 완성본을 쓰세요.")
     new = []
@@ -323,7 +323,7 @@ def ensure_rows(table, n):
 
 
 def regroup_items(table, rows):
-    """item 이 있는 행마다 세부항목 그룹을 다시 나눈다"""
+    """item 이 있는 행마다 세부항목 그룹 재분할"""
     if not any("item" in r for r in rows):
         return
     trs = table._tbl.findall(A("tr"))[1:]
@@ -407,7 +407,7 @@ def set_period_and_headers(slide, period, month):
 # --- 표지, Vision, Company OKR
 
 def apply_author(prs, author, cover_date):
-    """표지, Vision 의 작성자와 날짜를 쓴다"""
+    """표지, Vision 의 작성자 및 날짜 작성"""
     for sh in prs.slides[0].shapes:
         if sh.has_text_frame and len(sh.text_frame.paragraphs) == 2 and re.fullmatch(r"\d{4}\.\d{2}", sh.text_frame.paragraphs[1].text.strip()):
             p0, p1 = sh.text_frame.paragraphs
@@ -849,7 +849,7 @@ def _shift_down(below, boxes, dpt):
 
 
 def fit_board(slide):
-    """보드 장을 화면 안에 맞춘다"""
+    """보드 장을 화면 안에 맞춤"""
     sh = board_shape(slide)
     if sh is None:
         return []
@@ -871,7 +871,7 @@ def fit_board(slide):
     b_sz0 = _cells_size(t)
     x_sz0 = {id(x): _size_pt(x.table.cell(1, 0)._tc) for x in boxes}
     changes = []
-    # 글자보다 문단 간격부터 줄인다
+    # 글자보다 문단 간격 먼저 축소
     need_b0 = _board_height(t)
     tight = any(_box_need(x) > box_bottom - box_top0[id(x)] - box_head[id(x)] for x in boxes)
     clamp = (lambda v: v) if tight else (lambda v: max(0.0, v))
@@ -916,7 +916,7 @@ def fit_board(slide):
 
 
 def fit_textboxes(slide, slide_h_pt):
-    """글상자가 꼬리말 위로 넘치면 글자를 줄인다"""
+    """글상자가 꼬리말 위로 넘치면 글자 축소"""
     changes = []
     for x in slide.shapes:
         if not (x.has_text_frame and x.text_frame.text.strip()) or x.has_table:
@@ -993,7 +993,7 @@ def _cell_need(t, r, c, widths):
 
 
 def rebalance_columns(t, groups=((2,), (3, 4, 5, 6), (7,)), step=4.0, min_w=30.0):
-    """보드 열 너비를 묶음 단위로 다시 나눈다"""
+    """보드 열 너비를 묶음 단위로 재분배"""
     widths = [c.width / E_PT for c in t.columns]
     for gp in groups:
         avg = sum(widths[k] for k in gp) / len(gp)
@@ -1072,7 +1072,7 @@ def balance_boxes(slide, m, i):
 
 
 def fit_measured(prs, max_iter=8):
-    """실측 높이로 보드 장을 맞춘다"""
+    """실측 높이로 보드 장 맞춤"""
     log, left = [], []
     for it in range(max_iter):
         BOX_OVER.clear()
@@ -1188,7 +1188,7 @@ def fit_box_alone(x, avail):
 
 
 def move_boxes_to_next(prs, slide, snap):
-    """Plan/Review 를 통째로 다음 장으로 옮긴다"""
+    """Plan/Review 를 통째로 다음 장으로 이동"""
     cont = _clone_slide(prs, slide)
     sh = board_shape(cont)
     top = sh.top
@@ -1384,13 +1384,12 @@ def _pdf_overflow(prs, workdir):
     src = os.path.join(workdir, "fit.pptx")
     pdf = os.path.join(workdir, "fit.pdf")
     prs.save(src)
-    ps1 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "scripts", "render.ps1")
+    rpy = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "scripts", "render.py")
     if os.path.exists(pdf):
         os.remove(pdf)   # 렌더가 실패하면 지난 회차 PDF 를 읽지 않게
     try:
         import pdfplumber
-        r = subprocess.run(["powershell", "-NoProfile", "-File", ps1, "-Pptx", src, "-Out",
-                            os.path.join(workdir, "png"), "-Slides", "1", "-Pdf", pdf],
+        r = subprocess.run([sys.executable, "-P", rpy, src, os.path.join(workdir, "png"), "--slides", "1", "--pdf", pdf],
                            capture_output=True, timeout=240)
         if r.returncode:
             return None
@@ -1412,7 +1411,7 @@ def _pdf_overflow(prs, workdir):
 
 
 def fit_pages_measured(prs, max_iter=5):
-    """실제 렌더로 확인하며 글자를 줄인다"""
+    """실제 렌더로 확인하며 글자 축소"""
     log, left = [], []
     work = tempfile.mkdtemp(prefix="okr_page_")
     for _ in range(max_iter):

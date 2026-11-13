@@ -10,7 +10,7 @@
       "name": "interx-deck",
       "description": "INTERX 회사 양식 PPT: 공통 규칙(using), 보고 자료(report), 설계 문서와 구성도(design), 월간 Individual OKR(okr). 도형과 붙은 연결선으로 PowerPoint 에서 바로 고칠 수 있는 덱, 자동 배치, 관문 검사.",
       "source": "./",
-      "version": "1.3.3",
+      "version": "1.4.0",
       "category": "productivity"
     }
   ]

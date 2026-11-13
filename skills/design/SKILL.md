@@ -15,7 +15,7 @@ e = g.group("edge", "EdgePC", kind="edge", sub="설비 옆", header="INTERX.DA",
 cache, core = e.box(0, 0, "수집 계획 캐시"), e.box(3, 0, "수집 코어")         # (줄, 칸)
 p = g.group("platform", "중앙 서버", rows=(0, 1), header="AAS Server", badge="badge_aas_server")
 lake = g.group("platform", "연계 대상", rows=(3, 4), area=False).box(3, 0, "DataLake", kind="server", icon_="database")
-link(s, core, lake, color=ORANGE, text="HTTP", step=(2, "전송"), cond="조건 문구")
+link(s, core, lake, color=ACCENT, text="HTTP", step=(2, "전송"), cond="조건 문구")
 ```
 - 열: `right=None`(기본, 플랫폼 6.71 ~ 12.56), `right="source"`(오른쪽 Data Source 열 11.65). 왼쪽 원천 열이 없으면 EdgePC 가 0.75 부터
 - 같은 줄 번호의 상자는 묶음이 달라도 같은 높이(가로선이 곧게). 같은 묶음, 같은 칸 상자는 첫 선 전에 같은 폭
@@ -31,7 +31,7 @@ link(s, core, lake, color=ORANGE, text="HTTP", step=(2, "전송"), cond="조건 
 - 선은 `link(s, a, b, color, text=선 이름, step=(번호, 설명), cond=조건)`. 마주 보는 변, 상자를 뚫지 않음, 곧은 선 > ㄱ 자 > ㄷ 자. 주 흐름부터 긋는다
 - 여러 원천을 한 상자로 `fan(s, 상자, g.icons, ...)`, 상자에 붙는 번호 `step_by(s, 상자, n, 설명)`, 변을 꼭 정할 때만 `connect(...)`
 - 번호와 선 이름은 저장 직전에: 선 바로 옆 > 선에서 0.6 in 안(테두리 안) > 그래도 없으면 테두리를 걸침
-- 선 옆 번호 원은 0.15 in 7.26pt. 흐름 색: 기본 GRAY 1.5pt, 주 ORANGE, 둘째 BLUE, 의미 연결 GREEN 점선. 아래 번호 범례 줄은 만들지 않는다
+- 선 옆 번호 원은 0.15 in 7.26pt. 흐름 색: 기본 GRAY 1.5pt, 주 ACCENT(남색), 둘째 TEAL, 의미 연결 GREEN 점선. 주황은 쓰지 않음. 아래 번호 범례 줄은 만들지 않는다
 
 ## 3. AAS 과제용 (AAS 를 다루지 않으면 건너뜀)
 - 템플릿 14장 AAS 그림 `d.aas_shell(s, x, y, ["Identification", "HierarchicalStructures", "DataSource"], scale=0.55, focus_="DataSource")`, 펼친 내용은 `zoom_wedge` 와 `Col.chip_tree`

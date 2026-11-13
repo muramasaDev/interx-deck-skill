@@ -5,7 +5,7 @@ INTERX 회사 양식 PPT 를 만드는 Claude Code 플러그인.
 ## 설치
 
 ```sh
-npx --allow-git=all github:muramasaDev/interx-deck-skill
+npx --allow-git=all muramasaDev/interx-deck-skill
 ```
 
 설치가 끝나면 Claude Code 를 다시 시작한다.
@@ -13,7 +13,9 @@ npx --allow-git=all github:muramasaDev/interx-deck-skill
 - Python, 패키지, 글꼴이 없으면 함께 설치된다
 - 업데이트: 같은 명령
 - 제거: 명령 끝에 `uninstall`
-- 저장소 읽기 권한이 필요하다 (Windows, PowerPoint 사용)
+- 저장소 읽기 권한이 필요하다
+- Windows 와 Mac. 렌더 확인과 PDF 는 PowerPoint (Mac 은 PowerPoint 가 없으면 LibreOffice, 줄 바꿈이 조금 다를 수 있음)
+- Mac 은 명령의 `python` 을 `python3` 로
 
 ## 사용
 

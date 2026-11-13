@@ -55,7 +55,7 @@ def svg_to_png(svg: bytes, px_w: int) -> bytes:
 
 
 def add_png_fallbacks(files: dict) -> int:
-    """svgBlip 만 있는 그림에 PNG 대체를 단다"""
+    """svgBlip 만 있는 그림에 PNG 대체 추가"""
     made = 0
     seq = 0
     for n in sorted(files):
@@ -105,7 +105,7 @@ def add_png_fallbacks(files: dict) -> int:
 
 
 def fit_layout_pictures(path: str) -> int:
-    """레이아웃 그림을 장 안에 맞춘다"""
+    """레이아웃 그림을 장 안으로 맞춤"""
     from pptx import Presentation
     prs = Presentation(path)
     W, H = prs.slide_width, prs.slide_height
@@ -150,7 +150,7 @@ def main(src: str, dst: str) -> None:
 
 
 def fix_deck(src: str, dst: str) -> None:
-    """만든 덱에 PNG 대체 그림만 단다"""
+    """만든 덱에 PNG 대체 그림만 추가"""
     with zipfile.ZipFile(src) as zi:
         infos = zi.infolist()
         files = {i.filename: zi.read(i.filename) for i in infos}

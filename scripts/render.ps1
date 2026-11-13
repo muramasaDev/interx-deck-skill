@@ -1,5 +1,6 @@
-# 장마다 PNG, -Pdf 면 PDF 도. DRM 때문에 사본만 연다
-# 사용: render.ps1 -Pptx <파일> -Out <폴더> [-Slides 1,3] [-Pdf <파일>]
+# 장마다 PNG, -Pdf 면 PDF 추가
+# DRM 때문에 사본만 열기
+# 사용: -Pptx 파일 -Out 폴더 [-Slides 1,3] [-Pdf 파일]
 param([Parameter(Mandatory)][string]$Pptx, [Parameter(Mandatory)][string]$Out, [string]$Slides, [string]$Pdf)
 $ErrorActionPreference = 'Stop'
 $src = (Resolve-Path $Pptx).Path
@@ -17,7 +18,7 @@ try {
     foreach ($i in $list) { $p.Slides($i).Export((Join-Path $Out "s$i.png"), "PNG", 1600, 900) }
     if ($Pdf) {
         $p.SaveAs($tmpPdf, 32)   # 32 = ppSaveAsPDF
-        # Office 가 쓴 파일은 DRM 이 곧 암호화: .NET 으로 다시 씀
+        # Office 저장 파일은 DRM 암호화, .NET 으로 다시 씀
         [IO.File]::WriteAllBytes([IO.Path]::GetFullPath($Pdf), [IO.File]::ReadAllBytes($tmpPdf))
     }
     $p.Close()

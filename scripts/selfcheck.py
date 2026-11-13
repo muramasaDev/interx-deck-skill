@@ -7,6 +7,7 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ixdeck import *  # noqa: E402,F403
+from ixdeck import _linear, _math, etree  # noqa: E402
 
 out = sys.argv[1]
 d = Deck(author="AX Development / 점검")
@@ -41,7 +42,7 @@ e = server(s, 9.3, 2.68, 1.6, 0.27, "Data Process Server")
 f = db(s, 9.4, 3.5, 1.4, 0.22, "MongoDB")
 zone(s, 8.9, 3.3, 2.3, 1.0, color=GREEN, alpha=0.08)
 connect(s, a, "bottom", b, "top")
-connect(s, a, "right", e, "left", color=ORANGE)
+connect(s, a, "right", e, "left", color=ACCENT)
 connect(s, c, "right", f, "bottom", color=BLUE)
 connect(s, e, "bottom", f, "top", head="both")
 g = db(s, 9.4, 4.6, 1.4, 0.22, "Jena Fuseki")
@@ -67,7 +68,7 @@ assert abs(x1.top - y1.top) < 2, "같은 줄 상자 y 가 다름"
 focus(y1)
 p.zone(0, 0, 1, 1, color=GREEN)
 connect(s, src, "right", x1, "left", text="수집")
-connect(s, x1, "right", y1, "left", color=ORANGE, text="저장")
+connect(s, x1, "right", y1, "left", color=ACCENT, text="저장")
 link(s, x2, y2, color=BLUE)
 step_by(s, x1, 1, "수집", where="below_r", cond="변경사항 없는 경우")
 legend(s, 11.7, 5.4, [(BLUE, "AAS Node"), (GREEN, "SemanticId Node")])
@@ -186,7 +187,7 @@ p = g.group("platform", "Platform", cols=2, area=False)
 y1 = p.sub(0, 0, 2, header="서버", caption="설명").box(2, "다")
 bar_ = g.bar("platform", "Data Lake", tag_="EAC")
 g.stack("edge", "Edge.PC", "On-자산", n=1)
-fan(s, x1, g.icons, color=ORANGE, step=(1, "읽기"))
+fan(s, x1, g.icons, color=ACCENT, step=(1, "읽기"))
 link(s, x1, y1, step=(2, "보냄"))
 link(s, x2, bar_, color=BLUE, step=(3, "저장"))
 complex_slide = s
@@ -227,6 +228,9 @@ try:
     raise AssertionError("forbid 를 못 잡음")
 except ValueError as e:
     assert "forbid" in str(e), e
+_x = etree.tostring(_math(r"J_{보정} = J_{0} \times \frac{T + E}{\hat{d}}", 12, True), encoding="unicode")   # 수식
+assert all(t in _x for t in ("<m:f>", "<m:sSub>", "<m:acc>", "\U0001D43D", ">보정<", ">×<")), _x
+assert _linear(r"J_{0} \times \frac{T}{E}") == "J_0 × (T) / (E)", _linear(r"J_{0} \times \frac{T}{E}")
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 판 번호 셋이 같아야 함
 _v = [json.load(open(os.path.join(_root, f), encoding="utf8")) for f in ("package.json", ".claude-plugin/plugin.json",
                                                                        ".claude-plugin/marketplace.json")]

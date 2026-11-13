@@ -17,7 +17,7 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
-from check_ban import texts
+from check_ban import slide_texts
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(os.path.dirname(HERE), "assets")
@@ -42,7 +42,8 @@ TBL_HEAD = "AEAEAE"    # 표 머리칸
 BLUE = "0035D5"        # AAS 칩 (SM, SMC, SML)
 BLUE_L = "A8BEE2"      # Ent 칩
 GREEN = "13C690"       # EAC 표시, ISH 연결
-ORANGE = "EA580B"      # 번호 원, 핵심 행, 주 흐름
+ORANGE = "EA580B"      # 회사 주황: 목차 번호, 차트 계열 하나
+ACCENT = NAVY          # 강조: 번호 원, 이름표, 지금 단계, 핵심 행과 수치, 주 흐름
 RED = "FF0000"
 TEAL = "299288"        # 패널 소제목, 점선
 WHITE = "FFFFFF"
@@ -98,6 +99,8 @@ def normalize_fonts(path):
                         continue
                     local = el.tag.split("}")[-1]
                     if local in ("sym", "buFont") and name.startswith(_KEEP_FONT):
+                        continue
+                    if name == MATH_FONT:   # 수식 글꼴은 그대로
                         continue
                     if name != FONT:
                         el.set("typeface", FONT)
@@ -197,7 +200,7 @@ def _shadow(shape):
 
 
 def _no_style_effects(shape):
-    """테마 기본 테두리와 그림자를 끊는다"""
+    """테마 기본 테두리, 그림자 제거"""
     st = shape._element.find(qn("p:style"))
     if st is not None:
         shape._element.remove(st)
@@ -242,7 +245,7 @@ def text(s, x, y, w, h, t, size=7.26, bold=False, color=BLACK, align="l", anchor
 
 # --- 보고형 부품
 def panel(s, x, y, w, h, title):
-    """보고형 패널. 몸통을 돌려준다"""
+    """보고형 패널, 몸통 반환"""
     body = box(s, x, y + 0.29, w, h - 0.29, fill=WHITE, line=GRAY_L, geom="round", radius=0)
     box(s, x, y, w, 0.29, title, fill=PANEL, line=GRAY_L, geom="round2", size=12, bold=True, color=WHITE)
     return body
@@ -282,7 +285,7 @@ NUM_D, NUM_PT = 0.18, 8.0            # 목록, 카드, 캡처
 NUM_D_LINE, NUM_PT_LINE = 0.15, 7.26  # 구성도 선 옆
 
 
-def num_badge(s, x, y, n, color=ORANGE, d=NUM_D, size=NUM_PT, line=None):
+def num_badge(s, x, y, n, color=ACCENT, d=NUM_D, size=NUM_PT, line=None):
     """주황 번호 원"""
     return box(s, x, y, d, d, str(n), fill=color, line=line, lw=1.0 if line else 0.5, geom="oval", size=size,
                bold=True, color=WHITE, inset=(0, 0, 0, 0))
@@ -400,7 +403,7 @@ def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, hea
             head = i == 0
             c.fill.solid()
             c.fill.fore_color.rgb = _rgb(header_fill if head else WHITE)
-            col = header_color if head else (ORANGE if (i - 1) in highlight else BLACK)
+            col = header_color if head else (ACCENT if (i - 1) in highlight else BLACK)
             p = c.text_frame.paragraphs[0]
             a = (align[j] if align else ("c" if head else "l"))
             p.alignment = {"l": PP_ALIGN.LEFT, "c": PP_ALIGN.CENTER, "r": PP_ALIGN.RIGHT}[a]
@@ -431,7 +434,7 @@ def frame(s, x, y, w, h, title, kind="platform", sub=None):
             inset=(0.02, 0, 0.02, 0))
     elif kind == "edge":
         body = box(s, x, y + 0.27, w, h - 0.27, fill=WHITE, line="E2E8F0", lw=1, geom="round", radius=0, shadow=True)
-        lines = [(title, BLACK)] + ([(sub, ORANGE)] if sub else [])
+        lines = [(title, BLACK)] + ([(sub, ACCENT)] if sub else [])
         box(s, x, y, w, 0.24, lines, fill=SLATE3, size=6.35, bold=True, inset=(0.02, 0, 0.02, 0))
     else:
         body = box(s, x, y + 0.29, w, h - 0.29, fill=WHITE, line=BLACK, lw=0.5, shadow=True)
@@ -457,8 +460,8 @@ def area(s, x, y, w, h, line=SLATE4):
     return a
 
 
-def zone(s, x, y, w, h, color=ORANGE, alpha=0.06, above=None):
-    """옅은 색 구역. above 도형 바로 위에 깐다"""
+def zone(s, x, y, w, h, color=ACCENT, alpha=0.06, above=None):
+    """옅은 색 구역, above 도형 바로 위에 배치"""
     z = box(s, x, y, w, h, fill=color, alpha=alpha)
     if above is None:
         send_to_back(s, z)
@@ -467,7 +470,7 @@ def zone(s, x, y, w, h, color=ORANGE, alpha=0.06, above=None):
     return z
 
 
-def focus(shape, color=ORANGE, width=1.5):
+def focus(shape, color=ACCENT, width=1.5):
     """강조 상자에 주황 테두리"""
     _before_draw(shape)
     _line(shape, color, width)
@@ -499,7 +502,7 @@ def tag(s, x, y, t="EAC", fill=GREEN):
     return t_
 
 
-def step(s, x, y, n, label=None, color=ORANGE, label_w=None, label_color=BLACK):
+def step(s, x, y, n, label=None, color=ACCENT, label_w=None, label_color=BLACK):
     """번호 원 (0.15 in) 과 오른쪽 설명"""
     c = num_badge(s, x, y, n, color, d=NUM_D_LINE, size=NUM_PT_LINE)
     if label_w is None:
@@ -606,7 +609,7 @@ def connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=Non
 
 
 def line_label(s, a, side_a, b, side_b, t, mid=0.5, color=SLATE9):
-    """선 모양에 맞춰 선 이름 자리를 고른다"""
+    """선 모양 기준 선 이름 자리 선택"""
     (x1, y1), (x2, y2) = _pt(a, side_a), _pt(b, side_b)
     lw = _text_w(t, 6.35) + 0.08
     hz = ("left", "right")
@@ -631,7 +634,7 @@ def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=No
     (x1, y1), (x2, y2) = _pt(a, side_a), _pt(b, side_b)
     ha, hb = side_a in ("left", "right"), side_b in ("left", "right")
     swap = False
-    if ha != hb and not ha:  # 위아래에서 좌우로 가면 거꾸로 그린다
+    if ha != hb and not ha:  # 세로에서 가로로 가는 선은 역방향으로 그림
         a, side_a, b, side_b = b, side_b, a, side_a
         (x1, y1), (x2, y2) = (x2, y2), (x1, y1)
         ha, hb = True, False
@@ -736,7 +739,7 @@ def section(s, x, y, w, title, rows, row_h=0.3, highlight=(), size=9):
     for i, r in enumerate(rows):
         hl = i in highlight
         box(s, x, y + 0.27 + i * row_h + 0.02, w, row_h - 0.02, r, fill=ROW_BG, size=size, bold=hl,
-            color=ORANGE if hl else BLACK, align="l", inset=(0.1, 0, 0.05, 0))
+            color=ACCENT if hl else BLACK, align="l", inset=(0.1, 0, 0.05, 0))
     return y + 0.27 + len(rows) * row_h
 
 
@@ -833,13 +836,13 @@ def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="
                 for j in highlight:
                     pt = ser.points[j]
                     pt.format.fill.solid()
-                    pt.format.fill.fore_color.rgb = _rgb(ORANGE)
+                    pt.format.fill.fore_color.rgb = _rgb(ACCENT)
     _chart_font(ch)
     _obst(s, gf)
     return gf
 
 
-def screenshot(s, path, x, y, w, h, marks=(), color=ORANGE):
+def screenshot(s, path, x, y, w, h, marks=(), color=RED):
     """캡처를 칸에 넣고 marks 영역 표시"""
     pic = s.shapes.add_picture(path, Inches(x), Inches(y), width=Inches(w))
     if pic.height > Inches(h):
@@ -852,8 +855,8 @@ def screenshot(s, path, x, y, w, h, marks=(), color=ORANGE):
     return marks_on(s, pic, marks, color)
 
 
-def marks_on(s, pic, marks, color=ORANGE):
-    """그림 위에 영역 네모와 번호를 그린다"""
+def marks_on(s, pic, marks, color=RED):
+    """그림 위 영역 네모 및 번호"""
     px, py, pw, ph = pic.left / _E, pic.top / _E, pic.width / _E, pic.height / _E
     marks = _snap_marks(marks, pw, ph)
     placed = []
@@ -879,7 +882,7 @@ def snap_marks(marks, pw, ph, tol=0.2):
 
 
 def _snap_marks(marks, pw, ph, tol=0.2):
-    """가까운 변 (0.2 in 안) 을 한 값으로 맞춘다"""
+    """가까운 변 (0.2 in 이내) 정렬"""
     boxes = [list(m) for m in marks]
     for k, size in ((0, pw), (2, pw), (1, ph), (3, ph)):
         idx = sorted((i for i, m in enumerate(boxes) if len(m) == 5), key=lambda i: boxes[i][k])
@@ -898,7 +901,7 @@ def _snap_marks(marks, pw, ph, tol=0.2):
     return [tuple(m) for m in boxes]
 
 
-def kpi(s, x, y, w, h, value, unit, label_, sub=None, color=ORANGE):
+def kpi(s, x, y, w, h, value, unit, label_, sub=None, color=ACCENT):
     """큰 주황 숫자 핵심 수치. 덱의 1/5 장까지"""
     need = _text_w(str(value), 20) + (_text_w(" " + unit, 9) if unit else 0) + 0.25
     R = _reg(s)
@@ -944,7 +947,7 @@ def icon_cards(s, x, y, w, items, card=0.46):
 
 
 def zoom_wedge(s, src, x1, ty0, ty1):
-    """확대 표시. 펼친 내용보다 먼저 그린다"""
+    """확대 표시, 펼친 내용보다 먼저 그림"""
     x0, y0, _, y1 = _bb(src)
     x0 = _bb(src)[2]
     fb = s.shapes.build_freeform(Inches(x0), Inches(y0))
@@ -1018,22 +1021,22 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None):
     body_h = row_h * len(tasks)
     for i in range(1, len(periods)):
         box(s, x + label_w + i * pw - 0.0035, y + hh, 0.007, body_h, fill=LINE_L)
-    fills = {"done": GRAY_L, "now": ORANGE, "plan": SLATE6}
+    fills = {"done": GRAY_L, "now": ACCENT, "plan": SLATE6}
     for r, t in enumerate(tasks):
         name, a, b, kind = t[:4]
         note = t[4] if len(t) > 4 else ""
         ry = y + hh + r * row_h
         box(s, x, ry, label_w, row_h, name, fill=None, size=7.26, bold=kind == "now", align="l",
-            color=ORANGE if kind == "now" else BLACK, inset=(0.08, 0, 0.04, 0))
+            color=ACCENT if kind == "now" else BLACK, inset=(0.08, 0, 0.04, 0))
         box(s, x, ry + row_h - 0.0035, w, 0.007, fill=LINE_L)
         if kind == "mile":
             cx = x + label_w + a * pw
-            box(s, cx - 0.09, ry + row_h / 2 - 0.09, 0.18, 0.18, fill=ORANGE, geom="diamond")
+            box(s, cx - 0.09, ry + row_h / 2 - 0.09, 0.18, 0.18, fill=ACCENT, geom="diamond")
             if note:  # 장 밖으로 나가지 않게 마름모 왼쪽에
                 nw = _text_w(note, 6.35) + 0.1
                 right_room = x + w - (cx + 0.12)
                 nx, al = (cx + 0.12, "l") if right_room >= nw else (cx - 0.12 - nw, "r")
-                text(s, nx, ry + row_h / 2 - 0.1, nw, 0.2, note, size=6.35, bold=True, color=ORANGE, align=al,
+                text(s, nx, ry + row_h / 2 - 0.1, nw, 0.2, note, size=6.35, bold=True, color=ACCENT, align=al,
                      anchor="m")
         else:
             if kind not in fills:
@@ -1063,7 +1066,7 @@ def banner(s, t, tags=None, current=None, y=REPORT_TOP, x=None, w=None, h=0.4):
             i = len(tags) - 1 - k
             on = i == current
             box(s, x + w - 0.15 - (k + 1) * (tw_ + 0.04), y + (h - 0.2) / 2, tw_, 0.2, tg,
-                fill=ORANGE if on else WHITE, line=ORANGE if on else GRAY_L, lw=0.75, size=6.35, bold=True,
+                fill=ACCENT if on else WHITE, line=ACCENT if on else GRAY_L, lw=0.75, size=6.35, bold=True,
                 color=WHITE if on else SLATE9, geom="round", radius=0.3, inset=(0, 0, 0, 0))
     return y + h + 0.12
 
@@ -1157,8 +1160,216 @@ def ko_breaks(text, width, size):
     return out
 
 
+# --- 수식 (PowerPoint 수식 개체 OMML)
+MATH_FONT = "Cambria Math"
+_M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+_A14 = "http://schemas.microsoft.com/office/drawing/2010/main"
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_SYM = {"times": "×", "pm": "±", "le": "≤", "ge": "≥", "approx": "≈", "neq": "≠", "Delta": "Δ", "sigma": "σ",
+        "mu": "μ", "alpha": "α", "beta": "β", "sum": "∑", "%": "%", ",": " "}
+
+
+def _m(tag, *kids, **attrs):
+    el = etree.Element(f"{{{_M}}}{tag}", nsmap={"m": _M})
+    for k, v in attrs.items():
+        el.set(f"{{{_M}}}{k}", v)
+    el.extend(kids)
+    return el
+
+
+def _mi(ch):
+    """라틴 한 글자를 수학 기울임 글자로"""
+    if "A" <= ch <= "Z":
+        return chr(0x1D434 + ord(ch) - 65)
+    if "a" <= ch <= "z":
+        return "\u210E" if ch == "h" else chr(0x1D44E + ord(ch) - 97)
+    return ch
+
+
+def _mr(t, sz, upright=False):
+    r = _m("r")
+    if upright:
+        r.append(_m("rPr", _m("sty", val="p")))
+    rpr = etree.SubElement(r, qn("a:rPr"), lang="en-US", sz=str(round(sz * 100)))
+    if not upright:
+        rpr.set("i", "1")
+    etree.SubElement(etree.SubElement(rpr, qn("a:solidFill")), qn("a:srgbClr"), val=BLACK)
+    etree.SubElement(rpr, qn("a:latin"), typeface=MATH_FONT)
+    etree.SubElement(rpr, qn("a:ea"), typeface=FONT)
+    etree.SubElement(r, f"{{{_M}}}t").text = t
+    return r
+
+
+def _hangul(c):
+    return "가" <= c <= "힣"
+
+
+def _group(src, i):
+    """{...} 또는 한 글자, 앞 공백 무시. (내용, 다음 위치)"""
+    while i < len(src) and src[i] == " ":
+        i += 1
+    if i >= len(src):
+        raise ValueError(f"식 끝에 인자 없음: {src}")
+    if src[i] == "\\":
+        name = re.match(r"\\([A-Za-z]+|.)", src[i:]).group(0)
+        return name, i + len(name)
+    if src[i] != "{":
+        return src[i], i + 1
+    depth = 0
+    for j in range(i, len(src)):
+        depth += {"{": 1, "}": -1}.get(src[j], 0)
+        if depth == 0:
+            return src[i + 1:j], j + 1
+    raise ValueError(f"식 괄호 짝이 맞지 않음: {src}")
+
+
+def _tokens(src):
+    """식 조각 (종류, 값), 종류 cmd sub sup grp word ko sym"""
+    i = 0
+    while i < len(src):
+        c = src[i]
+        if c == "\\":
+            m_ = re.match(r"\\([A-Za-z]+|.)", src[i:])
+            if not m_:
+                raise ValueError(f"식 끝의 \\: {src}")
+            name = m_.group(1)
+            i += len(m_.group(0))
+            args = []
+            for _ in range({"frac": 2, "hat": 1, "bar": 1, "text": 1}.get(name, 0)):
+                a, i = _group(src, i)
+                args.append(a)
+            if name not in ("frac", "hat", "bar", "text") and name not in _SYM:
+                raise ValueError(f"식에 모르는 명령 \\{name}: {src}")
+            yield "cmd", (name, args)
+        elif c in "_^":
+            a, i = _group(src, i + 1)
+            yield ("sub" if c == "_" else "sup"), a
+        elif c == "{":
+            a, i = _group(src, i)
+            yield "grp", a
+        elif c == "}":
+            raise ValueError(f"식에 짝 없는 }}: {src}")
+        elif c == " ":
+            i += 1
+        elif c.isascii() and c.isalpha():
+            j = i
+            while j < len(src) and src[j].isascii() and src[j].isalpha():
+                j += 1
+            yield "word", src[i:j]
+            i = j
+        elif _hangul(c):
+            j = i
+            while j < len(src) and (_hangul(src[j]) or (src[j] == " " and j + 1 < len(src) and _hangul(src[j + 1]))):
+                j += 1
+            yield "ko", src[i:j]
+            i = j
+        else:
+            j = i + 1
+            while j < len(src) and not (src[j].isascii() and src[j].isalpha()) and not _hangul(src[j]) \
+                    and src[j] not in "\\_^ {}":
+                j += 1
+            yield "sym", src[i:j]
+            i = j
+
+
+def _omml(src, sz):
+    """작은 LaTeX 표기, 한 글자 변수만 기울임"""
+    out = []
+    toks = list(_tokens(src))
+    k = 0
+    while k < len(toks):
+        kind, val = toks[k]
+        k += 1
+        if kind == "cmd" and val[0] == "sum":   # 큰 연산자, 아래 위 한계
+            lim = {"sub": [], "sup": []}
+            while k < len(toks) and toks[k][0] in lim:
+                lim[toks[k][0]] = _omml(toks[k][1], sz)
+                k += 1
+            out.append(_m("nary", _m("naryPr", _m("chr", val="∑"), _m("limLoc", val="undOvr"),
+                                     *([_m("subHide", val="1")] if not lim["sub"] else []),
+                                     *([_m("supHide", val="1")] if not lim["sup"] else [])),
+                          _m("sub", *lim["sub"]), _m("sup", *lim["sup"]), _m("e")))
+        elif kind == "cmd":
+            name, args = val
+            if name == "frac":
+                out.append(_m("f", _m("num", *_omml(args[0], sz)), _m("den", *_omml(args[1], sz))))
+            elif name in ("hat", "bar"):
+                out.append(_m("acc", _m("accPr", _m("chr", val="\u0302" if name == "hat" else "\u0305")),
+                              _m("e", *_omml(args[0], sz))))
+            elif name == "text":
+                out.append(_mr(args[0], sz, True))
+            else:
+                out.append(_mr(_SYM[name], sz, True))
+        elif kind in ("sub", "sup"):
+            base = out.pop() if out else _mr("", sz, True)
+            out.append(_m("sSub" if kind == "sub" else "sSup", _m("e", base), _m(kind, *_omml(val, sz))))
+        elif kind == "grp":
+            out.append(_m("d", _m("dPr", _m("begChr", val=""), _m("endChr", val="")), _m("e", *_omml(val, sz))))
+        elif kind == "word":
+            out.append(_mr(_mi(val), sz) if len(val) == 1 else _mr(val, sz, True))
+        elif kind == "ko":
+            out.append(_mr(val, sz, True))
+        else:
+            out.append(_mr(val.replace("-", "\u2212"), sz, True))
+    for i, el in enumerate(out):   # 합 기호 뒤 한 항을 본체로
+        if el.tag == f"{{{_M}}}nary" and i + 1 < len(out):
+            el.find(f"{{{_M}}}e").append(out.pop(i + 1))
+    return out
+
+
+def _linear(src):
+    """수식을 못 그리는 프로그램용 한 줄 글"""
+    op = lambda t: f" {t} " if t in "=+-×±≤≥≈≠" else t
+    out = []
+    for kind, val in _tokens(src):
+        if kind == "cmd":
+            name, args = val
+            out.append(f"({_linear(args[0])}) / ({_linear(args[1])})" if name == "frac"
+                       else _linear(args[0]) if args else op(_SYM[name]))
+        elif kind in ("sub", "sup"):
+            t = _linear(val)
+            out.append(("_" if kind == "sub" else "^") + (f"({t})" if len(t) > 1 else t))
+        elif kind == "grp":
+            out.append(f"({_linear(val)})")
+        else:
+            out.append(op(val) if kind == "sym" else val)
+    return re.sub(r" +", " ", "".join(out)).strip()
+
+
+def _math(src, sz, display):
+    """a14:m 하나. display 면 가운데 수식 문단"""
+    om = _m("oMath", *_omml(src, sz))
+    if display:
+        om = _m("oMathPara", _m("oMathParaPr", _m("jc", val="centerGroup")), om)
+    el = etree.Element(f"{{{_A14}}}m", nsmap={"a14": _A14})
+    el.append(om)
+    el.set("lin", _linear(src))
+    return el
+
+
+def _alt_content(tb):
+    """수식 글상자를 mc:AlternateContent 로 감쌈. Fallback 은 한 줄 글"""
+    sp = tb._element
+    fb = copy.deepcopy(sp)
+    for el in list(fb.iter(f"{{{_A14}}}m")):
+        r = etree.Element(qn("a:r"))
+        etree.SubElement(r, qn("a:rPr"), lang="en-US", sz="1050")
+        etree.SubElement(r, qn("a:t")).text = el.get("lin")
+        el.getparent().replace(el, r)
+    for el in sp.iter(f"{{{_A14}}}m"):
+        del el.attrib["lin"]
+    parent = sp.getparent()
+    idx = parent.index(sp)
+    ac = etree.Element(f"{{{_MC}}}AlternateContent", nsmap={"mc": _MC})
+    ch = etree.SubElement(ac, f"{{{_MC}}}Choice", nsmap={"a14": _A14}, Requires="a14")
+    parent.remove(sp)
+    ch.append(sp)
+    etree.SubElement(ac, f"{{{_MC}}}Fallback").append(fb)
+    parent.insert(idx, ac)
+
+
 class Col:
-    """패널 안 세로 칸. done() 에서 높이를 나눈다"""
+    """패널 안 세로 칸, done() 에서 높이 분배"""
     MIN_GAP, MAX_GAP, MAX_ROW = 0.12, 0.50, 0.32
 
     def __init__(self, s, x, w, top=BODY_TOP, bottom=BODY_BOTTOM):
@@ -1234,7 +1445,7 @@ class Col:
                                                                        row_h=row_h + r, **kw),
                          rows=len(rows), room=max(0.36 - row_h, 0))
 
-    def steps(self, items, color=ORANGE):
+    def steps(self, items, color=ACCENT):
         """번호 설명 목록. items=[(번호, 제목, 설명)]"""
         w = self.w - NUM_D - 0.1
         for _, ttl, d in items:
@@ -1272,25 +1483,26 @@ class Col:
         return self._add(lambda: 0.33 + _unit_of(self.s, kind) * len(items),
                          lambda y, r: rule_list(self.s, self.x, y, self.w, title, items, pitch=_unit_of(self.s, kind)))
 
-    def tab_box(self, label, lines, color=ORANGE):
-        """주황 이름표 묶음. lines=[글, ...]"""
+    def tab_box(self, label, lines, color=ACCENT):
+        """왼쪽 위 이름표 묶음. lines=[글, ...]"""
+        if not label.strip() or re.search(r"(함|됨|듦|했음|있음|없음|하기|한다|된다|이다)$", label.strip()):
+            _warn(self.s, f"이름표 '{label}' 는 명사로 (예: '결론', '예측 대상')")
         w = self.w - 0.32
         body_txt = lambda: sum(_nl("• " + ln, w, 8) for ln in lines) * _lh(8)
         _unit(self.s, "tab_box", 0.14 + body_txt() + 0.12)
 
         def draw(y, r):
             U = _unit_of(self.s, "tab_box")
-            lw_ = _text_w(label, 9) + 0.4
-            body = box(self.s, self.x, y + 0.11, self.w, U, fill=None, line=color, lw=1, geom="round", radius=0.06)
+            lw_ = _text_w(label, 9) + 0.3
+            body = box(self.s, self.x, y + 0.11, self.w, U, fill=None, line=GRAY_L, lw=0.75)
             _wall(self.s, body)
-            box(self.s, self.x + (self.w - lw_) / 2, y, lw_, 0.22, label, fill=color, size=9, bold=True, color=WHITE,
-                geom="round", radius=0.5, inset=(0, 0, 0, 0))
+            box(self.s, self.x, y, lw_, 0.22, label, fill=color, size=9, bold=True, color=WHITE, inset=(0, 0, 0, 0))
             text(self.s, self.x + 0.16, y + 0.25, w, U - 0.2, ["• " + ln for ln in lines], size=8, color=BLACK)
             return body
         _reg(self.s).setdefault("list_titles", []).append(label)
         return self._add(lambda: 0.11 + _unit_of(self.s, "tab_box"), draw)
 
-    def num_cards(self, items, color=ORANGE):
+    def num_cards(self, items, color=ACCENT):
         """번호 카드. items=[(제목, 설명)]"""
         w = self.w - 0.12 - NUM_D - 0.1 - 0.1
         for ttl, d in items:
@@ -1320,34 +1532,43 @@ class Col:
             w_ = w0
             for k, it in enumerate(items):
                 on = k == current
-                sh = box(self.s, self.x + k * (w_ - 0.12), y, w_, h, it, fill=ORANGE if on else SLATE3, size=8,
+                sh = box(self.s, self.x + k * (w_ - 0.12), y, w_, h, it, fill=ACCENT if on else SLATE3, size=8,
                          bold=True, color=WHITE if on else BLACK, geom="homePlate" if k == 0 else "chevron",
                          inset=(0.14, 0, 0.1, 0))
             _reg(self.s)["obst"].append(((self.x, y, self.x + self.w, y + h), 0))   # 화살표끼리 일부러 겹침
         return self._add(h, draw)
 
     def formula(self, expr, where=None, name=None):
-        """식, 변수 정의, 단위를 함께 적는 수식 상자"""
+        """논문식 수식 상자 (PowerPoint 수식 개체)"""
         exprs = [expr] if isinstance(expr, str) else list(expr)
         where = list(where or [])
+        for x_ in where:
+            if ":" not in x_:
+                raise ValueError(f"formula where 는 '기호: 설명 (단위)': {x_}")
         w = self.w - 0.3
-        h = 0.16 + (_lh(9) if name else 0) + sum(_nl(e, w, 10.5) for e in exprs) * _lh(10.5)             + ((1 + sum(_nl(x_, w, 7.26) for x_ in where)) * _lh(7.26) + 0.04 if where else 0)
+        h = 0.16 + (_lh(9) if name else 0) + sum(_lh(12) * (2.5 if "\\sum_" in e or "\\sum^" in e else 1.9 if "\\frac" in e else 1.2)
+                                                       for e in exprs) \
+            + ((1 + sum(_nl(_linear(x_), w, 7.26) for x_ in where)) * _lh(7.26) + 0.04 if where else 0)
 
         def draw(y, r):
             body = box(self.s, self.x, y, self.w, h, fill="F7F8FB", line=GRAY_L, lw=0.75)
             tb = text(self.s, self.x + 0.15, y + 0.08, w, h - 0.16, "")
             tf = tb.text_frame
-            rows = ([(name, 9, True, ORANGE, "l")] if name else []) + [(e, 10.5, True, NAVY, "c") for e in exprs] +                 ([("여기서", 7.26, True, SLATE9, "l")] + [(x_, 7.26, False, SLATE9, "l") for x_ in where] if where else [])
-            for k, (txt, sz, b_, col, al) in enumerate(rows):
+            rows = ([(name, None, 9, True, "l")] if name else []) + [("", e, 12, False, "c") for e in exprs]
+            if where:
+                rows += [("여기서", None, 7.26, True, "l")]
+                rows += [(": " + x_.split(":", 1)[1].strip(), x_.split(":", 1)[0], 7.26, False, "l") for x_ in where]
+            for k, (txt, math_, sz, b_, al) in enumerate(rows):
                 p_ = tf.paragraphs[0] if k == 0 else tf.add_paragraph()
                 p_.alignment = {"l": PP_ALIGN.LEFT, "c": PP_ALIGN.CENTER}[al]
-                if p_.runs:
-                    p_.runs[0].text = txt
-                    r_ = p_.runs[0]
-                else:
-                    r_ = p_.add_run()
-                    r_.text = txt
-                _font(r_, sz, b_, col)
+                r_ = p_.runs[0] if p_.runs else p_.add_run()
+                r_.text = txt
+                _font(r_, sz, b_, SLATE9)
+                if math_ is not None:
+                    if not txt:
+                        p_._p.remove(r_._r)
+                    p_._p.insert(1 if p_._p.find(qn("a:pPr")) is not None else 0, _math(math_, sz, display=not txt))
+            _alt_content(tb)
             return body
         return self._add(h, draw)
 
@@ -1442,7 +1663,7 @@ def _col_box(s, key, shape, maxw, pic=None):
 
 
 def _settle(s, only=None):
-    """같은 열 상자 폭을 가장 넓은 것에 맞춘다"""
+    """같은 열 상자 폭을 최대 폭으로 통일"""
     R = _reg(s)
     for key, items in R.get("colbox", {}).items():
         if only is not None and key != only:
@@ -1593,7 +1814,7 @@ def link(s, a, b, color=GRAY, width=1.5, head="end", dash=None, text=None, step=
         R["obst"].append((_bb(x_), -1))
     if step:
         R["pending"].append(("step", (pts, a, b), step[1], step[0],
-                             step_color or (color if color != GRAY else ORANGE), cond))
+                             step_color or (color if color != GRAY else ACCENT), cond))
     if text:
         R["pending"].append(("text", (pts, a, b), text, None, SLATE9, None))
     return c
@@ -1601,7 +1822,7 @@ def link(s, a, b, color=GRAY, width=1.5, head="end", dash=None, text=None, step=
 
 def fan(s, hub, items, color=GRAY, width=1.5, head="end", direction="in", trunk=None, dash=None, step=None,
         cond=None, htype="triangle"):
-    """여러 상자를 한 줄기로 hub 에 잇는다"""
+    """여러 상자를 한 줄기로 hub 에 연결"""
     _before_draw(s)
     R = _reg(s)
     hx0, hy0, hx1, hy1 = _bb(hub)
@@ -1628,7 +1849,7 @@ def fan(s, hub, items, color=GRAY, width=1.5, head="end", direction="in", trunk=
     R["used"][(hub.shape_id, sh)] = R["used"].get((hub.shape_id, sh), 0) + 1
     if step:
         R["pending"].append(("step", ([(tx, lo), (tx, hi)], hub, hub), step[1], step[0],
-                             color if color != GRAY else ORANGE, cond))
+                             color if color != GRAY else ACCENT, cond))
     return tx
 
 
@@ -2063,7 +2284,7 @@ class _Group:
             label(self.s, x0, g.y(top_r) - 0.1, w, caption)
         return out
 
-    def zone(self, r0, r1, c0, c1, color=ORANGE, alpha=0.07):
+    def zone(self, r0, r1, c0, c1, color=ACCENT, alpha=0.07):
         """줄, 칸 범위를 덮는 옅은 구역"""
         r0, r1, c0, c1 = min(r0, r1), max(r0, r1), min(c0, c1), max(c0, c1)
         y0 = self.g.y(r0) - self.g.bh / 2 - 0.12
@@ -2093,7 +2314,7 @@ def note_by(s, shape, head, lines=()):
     _reg(s)["pending"].append(("note", shape, head, list(lines), RED, None))
 
 
-def step_by(s, shape, n, t=None, where="auto", color=ORANGE, cond=None, dx=0.0):
+def step_by(s, shape, n, t=None, where="auto", color=ACCENT, cond=None, dx=0.0):
     """상자 옆에 번호 원 자동 배치"""
     _before_draw(s)
     if where == "auto":
@@ -2114,7 +2335,7 @@ def step_by(s, shape, n, t=None, where="auto", color=ORANGE, cond=None, dx=0.0):
 def stack_bars(s, x, y, w, title, sub, n=2, pitch=0.6, dots=True):
     """겹친 띠. 대수를 알면 dots=False"""
     for i in range(n):
-        _obst(s, box(s, x, y + i * pitch, w, 0.24, [(title, BLACK), (sub, ORANGE)], fill=SLATE3, size=6.35, bold=True,
+        _obst(s, box(s, x, y + i * pitch, w, 0.24, [(title, BLACK), (sub, ACCENT)], fill=SLATE3, size=6.35, bold=True,
                      inset=(0.02, 0, 0.02, 0)))
     if dots:
         more(s, x + w / 2, y + n * pitch - 0.08)
@@ -2189,7 +2410,7 @@ def save_profile_author(team, name, title):
 
 
 class Deck:
-    """템플릿을 열고 새 장을 뒤에 붙인다"""
+    """템플릿에 새 장 추가"""
 
     def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=()):
         """parts_only: 본문만. forbid: 덱에 나가면 안 되는 정규식"""
@@ -2284,14 +2505,6 @@ class Deck:
             tf.text = t
             for r in tf.paragraphs[0].runs:
                 r.font.bold = True
-            if idx == 10 and t.split(" ", 1)[0].rstrip(".").isdigit() and " " in t:
-                num, rest = t.split(" ", 1)
-                p_ = tf.paragraphs[0]
-                p_.runs[0].text = num + " "
-                r2 = p_.add_run()
-                r2.text = rest
-                r2.font.bold = True
-                p_.runs[0].font.color.rgb = _rgb(ORANGE)
             # 자리표시자가 좁아 접힘: 장식 앞까지 넓힘
             l_, t_, h_ = ph.left, ph.top, ph.height   # 물려받은 값. 폭만 바꾸면 위치가 (0, 0)
             ph.left, ph.top, ph.height = l_, t_, h_
@@ -2332,7 +2545,7 @@ class Deck:
     _SHELL_PITCH = 0.2765
 
     def aas_shell(self, s, x, y, sms, scale=0.75, more=True, focus_=None, widen=0.0):
-        """템플릿 AAS 그림을 복제해 놓는다"""
+        """템플릿 AAS 그림 복제"""
         if not 1 <= len(sms) <= 7:
             raise ValueError("aas_shell: SM 은 1 ~ 7개")
         S = self._SHELL
@@ -2427,7 +2640,7 @@ class Deck:
                     print(f"주의 {i - lib_n}장: {m}")
                     problems.append(f"{i - lib_n}장: {m}")
                 alt = sl._element.xpath(".//p:cNvPr/@descr")   # 그림 대체 텍스트 (파일 이름)
-                for t in [t for sh in sl.shapes for t in texts(sh)] + alt:
+                for t in list(slide_texts(sl)) + alt:
                     for p in self.forbid:
                         if p.search(t):
                             print(f"주의 {i - lib_n}장: 금지 문구 '{p.search(t).group()}'")

@@ -14,7 +14,7 @@ const DEST = path.join(CLAUDE, "skills", "interx-deck");
 const MARK = ".installed-by-npm";
 const ITEMS = [".claude-plugin", "skills", "scripts", "assets", "README.md", "CHANGELOG.md"];
 
-const COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
+const COLOR = (process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
 const paint = (code) => (s) => (COLOR ? `\x1b[${code}m${s}\x1b[0m` : s);
 const rgb = (c, extra = "") => paint(`${extra}38;2;${c.join(";")}`);
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -29,44 +29,72 @@ const width = (s) => [...s.replace(/\x1b\[[0-9;]*m/g, "")].reduce((n, ch) => n +
 const pad = (s, n) => s + " ".repeat(Math.max(0, n - width(s)));
 const grad = (s, a, b) => [...s].map((ch, i, all) => rgb(mix(a, b, i / Math.max(1, all.length - 1)), "1;")(ch)).join("");
 
-// 5x5 픽셀 글꼴
-const GLYPH = {
-  I: ["███", " █ ", " █ ", " █ ", "███"],
-  N: ["█   █", "██  █", "█ █ █", "█  ██", "█   █"],
-  T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
-  E: ["████", "█   ", "███ ", "█   ", "████"],
-  R: ["████ ", "█   █", "████ ", "█  █ ", "█   █"],
-  X: ["█   █", " █ █ ", "  █  ", " █ █ ", "█   █"],
-  D: ["████ ", "█   █", "█   █", "█   █", "████ "],
-  C: [" ████", "█    ", "█    ", "█    ", " ████"],
-  K: ["█   █", "█  █ ", "███  ", "█  █ ", "█   █"],
-};
-const word = (w, row) => [...w].map((ch) => GLYPH[ch][row]).join(" ");
-const LEFT = word("INTERX", 0).length + 3;
-const ROWS = [0, 1, 2, 3, 4].map((r) => [...word("INTERX", r) + "   " + word("DECK", r)]);
-const W = ROWS[0].length + 1;
+// 村正: 도는 카타나 (반 칸 블록, 정사각 픽셀)
+const R = 18;                  // 회전 반지름 (픽셀)
+const N = 2 * R + 1;           // 그림 한 변: N 칸, N/2 줄
+const W = 46;                  // 정보 카드 폭
+const STEEL = [150, 162, 178];
+const EDGE = [232, 238, 246];
+const GOLD = [212, 172, 60];
+const ITO = [28, 28, 38];      // 손잡이 끈
+const SAME = [196, 186, 160];  // 손잡이 상어 가죽
+const RED = [200, 30, 40];
 
-// 가로 그라데이션 면, 아래로 갈수록 어둡게
-function face(r, c) {
-  const t = c < LEFT ? c / LEFT : (c - LEFT) / (W - LEFT);
-  const base = c >= LEFT ? mix([255, 255, 255], [125, 211, 252], t)
-    : t < 0.5 ? mix([255, 190, 90], ORANGE, t * 2) : mix(ORANGE, [200, 50, 30], (t - 0.5) * 2);
-  return mix(base, [0, 0, 0], r * 0.07);
+// 칼 좌표 (u 칼 방향, v 수직)의 색, 없으면 null
+// - 칼끝 u=15, 손잡이 끝 u=-15
+function part(u, v, glint) {
+  if (u >= -4 && u <= 15) {                     // 칼날, 휨(소리)과 칼끝 좁힘
+    const vb = v - 1.4 * ((u + 4) / 19) ** 2;
+    const half = u > 12 ? 1.2 * (15 - u) / 3 : 1.2;
+    if (Math.abs(vb) > half) return null;
+    if (Math.abs(u - glint) < 1.2) return [255, 255, 255];
+    return vb < 0 ? EDGE : STEEL;
+  }
+  if (u >= -4.9 && u < -4) return Math.abs(v) <= 1.4 ? GOLD : null;          // 하바키
+  if (u >= -6 && u < -4.9) return Math.abs(v) <= 3.2 ? [92, 74, 36] : null;  // 츠바
+  if (u >= -15 && u < -6) {                     // 손잡이, 마름모 무늬
+    if (Math.abs(v) > 1.4) return null;
+    if (u < -14.2) return GOLD;                 // 카시라
+    return Math.abs(((u * 1.2) % 2 + 2) % 2 - 1) > Math.abs(v) / 1.6 ? ITO : SAME;
+  }
+  return null;
+}
+
+// 각도 a 의 한 장면: 줄 목록
+function frame(a, glint) {
+  const c = Math.cos(a), s = Math.sin(a);
+  const k = 15.5 / R;            // 칼 좌표 단위로 맞춤
+  const px = (x, y) => part((x * c + y * s) * k, (-x * s + y * c) * k, glint);
+  const lines = [];
+  for (let r = 0; r < N; r += 2) {
+    let line = "  ";
+    for (let k = 0; k < N; k++) {
+      const x = k - R, top = px(x, R - r), bot = r + 1 < N ? px(x, R - r - 1) : null;
+      if (!COLOR) line += top && bot ? "█" : top ? "▀" : bot ? "▄" : " ";
+      else if (top && bot) line += `\x1b[38;2;${top.join(";")};48;2;${bot.join(";")}m▀\x1b[0m`;
+      else if (top) line += `\x1b[38;2;${top.join(";")}m▀\x1b[0m`;
+      else if (bot) line += `\x1b[38;2;${bot.join(";")}m▄\x1b[0m`;
+      else line += " ";
+    }
+    lines.push(line);
+  }
+  return lines;
 }
 
 function banner() {
-  const on = (r, c) => r >= 0 && c >= 0 && ROWS[r] && ROWS[r][c] === "█";
+  const end = Math.PI / 9;                       // 멈춘 자세: 칼끝 위로 20도
+  const steps = COLOR ? 40 : 1;
   console.log();
-  for (let r = 0; r < 6; r++) {
-    let line = "  ";
-    for (let c = 0; c < W; c++) {
-      if (on(r, c)) line += rgb(face(r, c))("█");
-      else if (on(r - 1, c - 1)) line += rgb([60, 60, 72])(COLOR ? "▓" : "░");
-      else line += " ";
-    }
-    console.log(line);
-    sleep(35);
+  if (COLOR) process.stdout.write("\x1b[?25l"); // 커서 숨김
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, ease = 1 - (1 - t) ** 3;
+    const lines = frame(end - 4 * Math.PI * (1 - ease), -6 + 24 * t);
+    if (i < steps) process.stdout.write(lines.join("\n") + `\n\x1b[${lines.length}A`);
+    else process.stdout.write((COLOR ? "\x1b[J" : "") + lines.filter((l) => l.trim()).join("\n") + "\n\n");  // 빈 줄 제거
+    sleep(28);
   }
+  if (COLOR) process.stdout.write("\x1b[?25h");
+  console.log(`  ${grad("村正", RED, [120, 10, 20])}  ${bold("M U R A M A S A")}  ${dim("伊勢国 桑名")}`);
   const head = `${dim("─ ")}${bold("interx-deck")} `;
   const ver = ` ${rgb(ORANGE, "1;")("v" + PKG.version)}${dim(" ─")}`;
   const row = (s) => console.log(`  ${dim("│")} ${pad(s, W - 4)} ${dim("│")}`);
@@ -135,40 +163,53 @@ const run = (c) => {
     return false;
   }
 };
-const findPython = () => ["python", "py -3"].find((py) => run(`${py} -c "import sys; assert sys.version_info >= (3, 11)"`));
+const WIN = process.platform === "win32";
+const MAC = process.platform === "darwin";
+const findPython = () => (WIN ? ["python", "py -3"] : ["python3", "python3.13", "python3.12", "python3.11", "python"])
+  .find((py) => run(`${py} -c "import sys; assert sys.version_info >= (3, 11)"`));
 
 // Python, 패키지가 없으면 설치 (사용자 범위, 관리자 권한 불필요)
 function ensurePython() {
   let py = findPython();
-  if (!py && process.platform === "win32") {
+  if (!py && WIN) {
     busy("Python 설치 중 (winget)");
     run("winget install -e --id Python.Python.3.12 --scope user --silent " +
         "--accept-package-agreements --accept-source-agreements");
     const exe = path.join(os.homedir(), "AppData", "Local", "Programs", "Python", "Python312", "python.exe");
     py = findPython() || (fs.existsSync(exe) ? `"${exe}"` : null);
   }
-  if (!py) return step("Python", false, "설치 실패: python.org 에서 설치 후 다시 실행");
+  if (!py && MAC && run("brew --version")) {
+    busy("Python 설치 중 (Homebrew)");
+    run("brew install python@3.12");
+    py = findPython();
+  }
+  if (!py) return step("Python", false, "설치 실패: python.org 에서 3.11 이상 설치 후 다시 실행");
   const has = () => run(`${py} -c "import pptx, lxml, PIL, pdfplumber"`);
   if (!has()) {
     busy("Python 패키지 설치 중");
-    run(`${py} -m pip install --user -q ${PY_PKGS}`);
+    // 쓰기 불가면 pip 이 사용자 범위로 설치
+    run(`${py} -m pip install -q ${PY_PKGS}`) ||
+      run(`${py} -m pip install -q --break-system-packages ${PY_PKGS}`);   // Homebrew Python (PEP 668)
   }
   if (has()) step("Python", true, "패키지 준비됨");
   else step("Python", false, `패키지 설치 실패: ${py} -m pip install ${PY_PKGS}`);
 }
 
-// 파일이 아니라 등록 여부로 판단 (등록 안 된 파일은 안 보임)
-const hasFont = () => ["HKLM", "HKCU"].some((root) =>
-  run(`reg query "${root}\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /f "Noto Sans KR"`));
+// Windows 는 파일이 아니라 등록 여부로 판단 (등록 안 된 파일은 안 보임)
+const MAC_FONTS = [path.join(os.homedir(), "Library", "Fonts"), "/Library/Fonts"];
+const hasFont = () => (WIN
+  ? ["HKLM", "HKCU"].some((root) =>
+    run(`reg query "${root}\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /f "Noto Sans KR"`))
+  : MAC_FONTS.some((d) => fs.existsSync(d) && fs.readdirSync(d).some((f) => /^NotoSansKR/i.test(f))));
 
 // 관리자 권한 없이 사용자 글꼴로 설치 (OFL)
 function installFont() {
   const file = "NotoSansKR-VF.ttf";
-  const dir = path.join(os.homedir(), "AppData", "Local", "Microsoft", "Windows", "Fonts");
+  const dir = WIN ? path.join(os.homedir(), "AppData", "Local", "Microsoft", "Windows", "Fonts") : MAC_FONTS[0];
   try {
     fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(SRC, "assets", "fonts", file), path.join(dir, file));
-    execSync(`reg add "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans KR (TrueType)" ` +
+    if (WIN) execSync(`reg add "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans KR (TrueType)" ` +
              `/t REG_SZ /d "${path.join(dir, file)}" /f`, { stdio: "ignore" });
     return true;
   } catch {
@@ -176,12 +217,23 @@ function installFont() {
   }
 }
 
+// 렌더 프로그램 확인
+function renderer() {
+  if (WIN) return step("렌더", true, "PowerPoint");
+  if (MAC && fs.existsSync("/Applications/Microsoft PowerPoint.app")) return step("렌더", true, "PowerPoint for Mac");
+  if (run("soffice --version") || fs.existsSync("/Applications/LibreOffice.app")) {
+    return step("렌더", true, "LibreOffice (PowerPoint 와 줄 바꿈이 다를 수 있음)");
+  }
+  step("렌더", false, "PowerPoint 또는 LibreOffice 필요 (렌더 확인과 PDF)");
+}
+
 function checks() {
   ensurePython();
-  if (process.platform !== "win32") return step("PowerPoint", false, "렌더 확인은 Windows 필요");
-  if (hasFont()) return step("글꼴", true, "Noto Sans KR");
-  if (installFont()) step("글꼴", true, "Noto Sans KR 설치 (안 보이면 다시 로그인)");
+  if (!WIN && !MAC) return step("OS", false, "Windows, Mac 만 지원");
+  if (hasFont()) step("글꼴", true, "Noto Sans KR");
+  else if (installFont()) step("글꼴", true, "Noto Sans KR 설치 (안 보이면 다시 로그인)");
   else step("글꼴", false, "Noto Sans KR 설치 실패");
+  renderer();
 }
 
 const cmd = process.argv[2] || "install";
@@ -191,5 +243,5 @@ if (cmd === "--version" || cmd === "-v") {
   banner();
   cmd === "install" ? install() : uninstall();
 } else {
-  fail("사용: npx --allow-git=all github:muramasaDev/interx-deck-skill [install|uninstall|--version]");
+  fail("사용: npx --allow-git=all muramasaDev/interx-deck-skill [install|uninstall|--version]");
 }

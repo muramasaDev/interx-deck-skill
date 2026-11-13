@@ -12,12 +12,12 @@ description: 월간 Individual OKR 덱(회사 표준 양식 IX-SF-001) 작성. �
 
 | 명령 | 역할 |
 |---|---|
-| `python -I S/okr_scan.py find <폴더...>` | 폴더에서 OKR 덱을 찾아 최신 월 순으로 |
-| `python -I S/okr_scan.py read <지난달 덱> --out pre.json` | 작성자, 이번 달 계획, KR 행, 지난달 실적을 읽어 spec 초안 |
-| `python -I S/okr_scan.py evidence <YYYY-MM> <폴더...>` | git 저장소의 그 달 내 커밋, 머지, git 아닌 폴더의 그 달 수정 파일 |
-| `python -I S/okr_deck.py build <지난달 덱> <spec.json> <출력.pptx>` | 덱 생성. 행 1~5 자동 증감, 화면 맞춤 |
-| `python -I S/okr_deck.py check <출력.pptx> [--style own]` | 검사 (아래 문구 규칙 포함) |
-| `powershell -NoProfile -File ${CLAUDE_PLUGIN_ROOT}/scripts/render.ps1 -Pptx <출력> -Out <폴더>` | 확인용 PNG |
+| `python -P S/okr_scan.py find <폴더...>` | 폴더에서 OKR 덱을 찾아 최신 월 순으로 |
+| `python -P S/okr_scan.py read <지난달 덱> --out pre.json` | 작성자, 이번 달 계획, KR 행, 지난달 실적을 읽어 spec 초안 |
+| `python -P S/okr_scan.py evidence <YYYY-MM> <폴더...>` | git 저장소의 그 달 내 커밋, 머지, git 아닌 폴더의 그 달 수정 파일 |
+| `python -P S/okr_deck.py build <지난달 덱> <spec.json> <출력.pptx>` | 덱 생성. 행 1~5 자동 증감, 화면 맞춤 |
+| `python -P S/okr_deck.py check <출력.pptx> [--style own]` | 검사 (아래 문구 규칙 포함) |
+| `python -P ${CLAUDE_PLUGIN_ROOT}/scripts/render.py <출력> <폴더>` | 확인용 PNG (Windows, Mac) |
 
 ## 덱 구조
 표지, Vision, Company OKR, **일반 보드 2장, 도전 보드 2장**(당월 일반, 당월 도전, 익월 일반, 익월 도전), Appendix.
@@ -82,12 +82,12 @@ description: 월간 Individual OKR 덱(회사 표준 양식 IX-SF-001) 작성. �
 
 ## Appendix
 - 산출물 1개 = 1장, 캡션 `[참고N] 설명` (번호 자동, Review 에서 `(참고N)` 으로 가리킴). 이미지 가로 1,600px 이상 (check)
-- 웹 화면은 Playwright 로 3840x2160, 보고 덱 장은 render.ps1 로 렌더해 필요한 부분만 spec `crop` 으로 자른다
+- 웹 화면은 Playwright 로 3840x2160, 보고 덱 장은 render.py 로 렌더해 필요한 부분만 spec `crop` 으로 자른다
 - 핵심 개요 3줄 안팎: 이미지에 보이는 값이나 근거 문서 값만, 캡처 날짜와 환경
 - 비밀번호, 고객 식별 정보, 내부 접속 주소, 개발 환경 경고 배너가 보이면 쓰지 않는다
 
 ## 주의
-- PowerPoint 로 연 파일은 회사 DRM 이 암호화한다. 원본과 출력은 python-pptx 로만 다루고, 확인은 render.ps1 이 만드는 사본 렌더로 한다
-- build 의 실측 맞춤도 render.ps1 로 사본을 PDF 로 만들어 잰다 (pdfplumber 가 없으면 건너뜀)
+- PowerPoint 로 연 파일은 회사 DRM 이 암호화한다. 원본과 출력은 python-pptx 로만 다루고, 확인은 render.py 가 만드는 사본 렌더로 한다
+- build 의 실측 맞춤도 render.py 로 사본을 PDF 로 만들어 잰다 (pdfplumber 가 없으면 건너뜀)
 - 다른 세션이 작업 중인 저장소는 대신 커밋하지 않는다. 오래 커밋 안 된 변경, 원격 없는 저장소는 보고만 한다
 - 일반 장표 규칙은 적용하지 않는다. 양식 서식을 그대로 따른다

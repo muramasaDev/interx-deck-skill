@@ -89,7 +89,7 @@ if not re.match(r"^\d{8}_[^_\s]+_[^_\s]+_v\d+\.\d+\.\d+$", _stem):
 if want is not None and len(slides) != want:
     bad.append(f"장 수 {len(slides)} (기대 {want})")
 for n in slides:
-    x = z.read(n).decode("utf8")
+    x = re.sub(r"<mc:Fallback>.*?</mc:Fallback>", "", z.read(n).decode("utf8"), flags=re.S)  # 수식 대체본
     tag = n.split("/")[-1]
     c, st, en = x.count("<p:cxnSp>"), x.count("<a:stCxn"), x.count("<a:endCxn")
     if not (c == st == en):
@@ -98,7 +98,7 @@ for n in slides:
     if len(ids) != len(set(ids)):
         bad.append(f"{tag}: 도형 번호 중복 {sorted({i for i in ids if ids.count(i) > 1})}")
     fonts = {f for k, f in re.findall(r'<a:(latin|ea|cs|sym|buFont|font)[^>]*typeface="([^"+][^"]*)"', x)
-             if f != FONT and not (k in ("sym", "buFont") and f.startswith(("Wingdings", "Symbol", "Webdings")))}
+             if f not in (FONT, "Cambria Math") and not (k in ("sym", "buFont") and f.startswith(("Wingdings", "Symbol", "Webdings")))}
     if fonts:
         bad.append(f"{tag}: {FONT} 아닌 글꼴 {sorted(fonts)} (굵기 이름 글꼴도 안 됨, 굵게 켬으로)")
     A_ = "{http://schemas.openxmlformats.org/drawingml/2006/main}"

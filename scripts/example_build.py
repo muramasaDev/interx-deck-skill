@@ -1,4 +1,4 @@
-"""새 덱 출발점. build.py 로 복사해 내용만 바꾼다"""
+"""새 덱 출발점 (build.py 로 복사, 내용만 교체)"""
 import os
 import sys
 import tempfile
@@ -30,9 +30,9 @@ top = banner(s, "기준 안 항목 15개, 검토 결함 22건 모두 고침", ta
 a, b, c = cols = report_panels(s, ["핵심 수치", "구간별 건수", "검토 결함"], top=top,
                                footnote="* 예시 값: 형식을 보이기 위한 수")
 (a.kpis([("15", "개", "기준 안 항목"), ("22", "건", "검토 결함")])   # 핵심 수치는 덱 본문의 1/5 장까지
-  .num_cards([("기준 안 항목", "전체 22개 중 15개가 0.2 미만"), ("검토 결함", "4번 검토에서 22건, 모두 고침")])
-  .formula("기준 안 비율 = 기준 안 항목 / 전체 항목", where=["기준 안 항목: 거리 0.2 in 미만 (개)", "전체 항목: 22 (개)"],
-           name="기준 안 비율 (직접 정의)"))
+  .num_cards([("기준 안 항목", "전체 22개 중 15개가 0.2 미만")])
+  .formula(r"R = \frac{N_{기준}}{N} \times 100",   # 한 글자 기호, 기호마다 설명과 단위
+           where=["R: 기준 안 비율 (%)", "N_{기준}: 거리 0.2 in 미만 항목 (개)", "N: 전체 항목 (개)"]))
 (b.chart("col", ["0.1 미만", "0.1 ~ 0.2", "0.2 ~ 0.5", "0.5 이상"], {"건수": [7, 8, 3, 4]}, h=2.6,
          highlight=(0, 1), number_format='0"개"')
   .notes(["15개가 0.2 미만", "강조 막대는 기준 안 구간"]))
@@ -59,7 +59,7 @@ for col in cols:
     col.done()
 
 d.section("일정 및 방법")
-s = d.page("단계별 일정 (예시)", lead="막대 색은 끝남 회색, 진행 주황, 예정 남회색이고 마름모는 마일스톤임")
+s = d.page("단계별 일정 (예시)", lead="막대 색은 끝남 회색, 진행 남색, 예정 남회색이고 마름모는 마일스톤임")
 (a,) = cols = report_panels(s, ["단계별 일정"], widths=(12.8,))
 a.chevrons(["1단계 요구 및 설계", "2단계 구현 및 시험", "3단계 현장 적용"], current=1)
 a.gantt(["1월", "2월", "3월", "4월", "5월", "6월"],
@@ -104,11 +104,11 @@ s4 = p.sub(1, 0, 3, header="저장 및 화면")
 db_, web = s4.box(1, "DB"), s4.box(3, "웹 화면")
 lake = g.bar("platform", "데이터 저장소")
 mail = g.bar("edge", "메일 서버", fill=GRAY)
-link(s, plan, cache, color=BLUE, text="HTTPS", step=(1, "계획 받기"))
-fan(s, core, plcs, color=ORANGE, step=(2, "PLC 읽기"))
-link(s, core, csv, color=ORANGE, step=(3, "기록"))
-link(s, core, send, color=ORANGE)
-link(s, send, lake, color=ORANGE, text="HTTP", step=(4, "전송"))
+link(s, plan, cache, color=TEAL, text="HTTPS", step=(1, "계획 받기"))
+fan(s, core, plcs, color=ACCENT, step=(2, "PLC 읽기"))
+link(s, core, csv, color=ACCENT, step=(3, "기록"))
+link(s, core, send, color=ACCENT)
+link(s, send, lake, color=ACCENT, text="HTTP", step=(4, "전송"))
 link(s, send, spool, color=RED, dash="sysDot", step=(5, "실패분 보관"))
 link(s, report, status, color=GRAY, step=(6, "현황 보고"))
 link(s, alarm, mail, color=GRAY, step=(7, "알림 메일"))

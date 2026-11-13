@@ -13,10 +13,11 @@ BAN = os.path.join(HERE, "check_ban.py")
 
 def run(cmd, cwd=None, timeout=600):
     try:
-        r = subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout)
+        r = subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout,
+                           env={**os.environ, "PYTHONIOENCODING": "utf-8"})   # 자식 출력은 UTF-8
     except subprocess.TimeoutExpired:
         return 124, f"{timeout}초 안에 끝나지 않음: {cmd[-3:]}"
-    out = (r.stdout + r.stderr).decode("cp949", "replace")
+    out = (r.stdout + r.stderr).decode("utf-8", "replace")
     return r.returncode, out
 
 
@@ -35,7 +36,7 @@ def main():
         sys.exit(1)
     fails = []
     t0 = time.time()
-    rc, out = run([sys.executable, "-I", build], cwd=os.path.dirname(build))
+    rc, out = run([sys.executable, "-P", build], cwd=os.path.dirname(build))
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     pptx = next((l for l in reversed(lines) if l.lower().endswith(".pptx")), None)
     if pptx:
@@ -44,7 +45,7 @@ def main():
         print("== 1. build 실패 (오류, 경로 없음, 또는 이번에 저장하지 않은 예전 파일)\n" + "\n".join(lines[-25:]))
         sys.exit(1)
     print(f"== 1. build OK: {pptx}")
-    rc, out = run([sys.executable, "-I", os.path.join(HERE, "check.py"), pptx] + want)
+    rc, out = run([sys.executable, "-P", os.path.join(HERE, "check.py"), pptx] + want)
     print("== 2. check\n" + out.strip())
     if rc:
         fails.append("check")
@@ -52,7 +53,7 @@ def main():
         print(f"== 3. 금지 표현 검사 파일 없음: {BAN} (interx-deck/scripts 에 있어야 함)")
         fails.append("금지 표현 검사 없음")
     else:
-        rc, out = run([sys.executable, "-I", BAN, pptx])
+        rc, out = run([sys.executable, "-P", BAN, pptx])
         print("== 3. 금지 표현\n" + out.strip())
         if rc:
             fails.append("금지 표현")
@@ -62,8 +63,7 @@ def main():
     for old in glob.glob(os.path.join(img, "*.png")):  # 예전 덱 그림이 섞이지 않게
         os.remove(old)
     pdf = os.path.splitext(pptx)[0] + ".pdf"   # 결과물: pptx 옆에 같은 이름
-    rc, out = run(["powershell", "-NoProfile", "-File", os.path.join(HERE, "render.ps1"), "-Pptx", pptx, "-Out", img,
-                   "-Pdf", pdf])
+    rc, out = run([sys.executable, "-P", os.path.join(HERE, "render.py"), pptx, img, "--pdf", pdf])
     pngs = sorted((f for f in os.listdir(img) if f[0] == "s" and f[1:-4].isdigit()), key=lambda f: int(f[1:-4]))
     if rc or not pngs:
         fails.append("렌더")
