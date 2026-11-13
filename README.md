@@ -11,7 +11,9 @@ npx --allow-git=all muramasaDev/interx-deck-skill
 설치가 끝나면 Claude Code 를 다시 시작한다.
 
 - Python, 패키지, 글꼴이 없으면 함께 설치된다
-- 업데이트: 같은 명령
+- 업데이트: 같은 명령 (항상 최신 판). 설치 화면에 `업데이트 1.4.0 → 1.4.1` 처럼 판 번호가 나온다
+- 특정 판: 명령 끝에 `#v1.4.1` (판 목록은 저장소 Tags, 바뀐 점은 CHANGELOG.md)
+- 최신 판 번호만 보기: 명령 끝에 `--version`
 - 제거: 명령 끝에 `uninstall`
 - 저장소 읽기 권한이 필요하다
 - Windows 와 Mac. 렌더 확인과 PDF 는 PowerPoint (Mac 은 PowerPoint 가 없으면 LibreOffice, 줄 바꿈이 조금 다를 수 있음)
@@ -41,3 +43,10 @@ Claude Code 에서 말로 요청한다. 덱마다 작성자, 파일명, 버전�
 ## 라이선스
 
 INTERX 사내 전용. 번들 글꼴 Noto Sans KR 은 SIL OFL 1.1.
+
+## 배포 (관리자)
+
+1. 판 번호 올림: `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` 세 곳 같게 (selfcheck 가 확인)
+2. `CHANGELOG.md` 맨 위에 판 번호와 바뀐 점
+3. 커밋 메시지 첫 줄에 판 번호: `release: v1.4.1, 요약`
+4. `git tag -a v1.4.1 -m "v1.4.1"` 후 `git push origin main --follow-tags`

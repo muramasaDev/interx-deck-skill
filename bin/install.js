@@ -30,78 +30,148 @@ const pad = (s, n) => s + " ".repeat(Math.max(0, n - width(s)));
 const grad = (s, a, b) => [...s].map((ch, i, all) => rgb(mix(a, b, i / Math.max(1, all.length - 1)), "1;")(ch)).join("");
 
 // 村正: 도는 카타나 (반 칸 블록, 정사각 픽셀)
-const R = 21;                  // 회전 반지름 (픽셀)
-const N = 2 * R + 1;           // 그림 한 변: N 칸, N/2 줄
 const W = 46;                  // 정보 카드 폭
-const STEEL = [150, 162, 178];
-const EDGE = [232, 238, 246];
-const GOLD = [212, 172, 60];
-const ITO = [28, 28, 38];      // 손잡이 끈
-const SAME = [196, 186, 160];  // 손잡이 상어 가죽
+const SPINE = [96, 104, 118];  // 칼등
+const STEEL = [168, 178, 192];
+const EDGE = [226, 232, 240];
+const HAMON = [250, 252, 255]; // 물결 무늬
+const BLOOD = [150, 0, 14];
+const BLOOD_D = [92, 0, 8];
+const GOLD = [176, 132, 40];
+const TSUBA = [24, 22, 26];
+const ITO = [120, 8, 20];      // 손잡이 끈 (붉은 실)
+const SAME = [20, 18, 22];     // 손잡이 가죽 (검정)
 const RED = [200, 30, 40];
 
 // 칼 좌표 (u 칼 방향, v 수직)의 색, 없으면 null
-// - 칼끝 u=15, 손잡이 끝 u=-11 (날 약 2.6배)
+// - 칼끝 u=17, 손잡이 끝 u=-9 (날 약 3.4배)
 function part(u, v, glint) {
-  if (u >= -2.5 && u <= 15) {                   // 칼날, 휨(소리)과 칼끝 좁힘
-    const vb = v - 1.5 * ((u + 2.5) / 17.5) ** 2;
-    const half = u > 12.5 ? 1.15 * (15 - u) / 2.5 : 1.15;
+  if (u >= -2.5 && u <= 17) {                   // 칼날: 휨, 칼끝 좁힘, 물결 무늬, 피
+    const vb = v - 1.8 * ((u + 2.5) / 19.5) ** 2;
+    const half = u > 14 ? 1.25 * (17 - u) / 3 : 1.25;
     if (Math.abs(vb) > half) return null;
-    if (Math.abs(u - glint) < 1.2) return [255, 255, 255];
-    return vb < 0 ? EDGE : STEEL;
+    if (Math.abs(u - glint) < 1) return [255, 255, 255];
+    if (u > 7 && vb < 0 && Math.sin(u * 2.7) + Math.cos(u * 1.3 + v) > 1.1) return u > 11 ? BLOOD : BLOOD_D;
+    if (vb > 0.45) return SPINE;
+    if (vb < -0.1 + 0.25 * Math.sin(u * 2.4)) return vb < -half + 0.3 ? HAMON : EDGE;
+    return STEEL;
   }
-  if (u >= -3.3 && u < -2.5) return Math.abs(v) <= 1.4 ? GOLD : null;        // 하바키
-  if (u >= -4.3 && u < -3.3) return Math.abs(v) <= 3 ? [92, 74, 36] : null;  // 츠바
-  if (u >= -11 && u < -4.3) {                   // 손잡이, 마름모 무늬
-    if (Math.abs(v) > 1.35) return null;
-    if (u < -10.3) return GOLD;                 // 카시라
-    return Math.abs(((u * 1.2) % 2 + 2) % 2 - 1) > Math.abs(v) / 1.6 ? ITO : SAME;
+  if (u >= -3.3 && u < -2.5) return Math.abs(v) <= 1.5 ? GOLD : null;   // 하바키
+  if (u >= -4.3 && u < -3.3) return Math.abs(v) <= 3.2 ? TSUBA : null;  // 츠바
+  if (u >= -9 && u < -4.3) {                    // 손잡이, 마름모 무늬
+    if (Math.abs(v) > 1.4) return null;
+    if (u < -8.3) return GOLD;                  // 카시라
+    return Math.abs(((u * 1.3) % 2 + 2) % 2 - 1) > Math.abs(v) / 1.6 ? ITO : SAME;
   }
   return null;
 }
 
-// 각도 a 의 한 장면: 줄 목록
-function frame(a, glint) {
-  const c = Math.cos(a), s = Math.sin(a);
-  const k = 15.5 / R;            // 칼 좌표 단위로 맞춤
-  const px = (x, y) => part((x * c + y * s) * k, (-x * s + y * c) * k, glint);
+// 픽셀 함수 px(x, y) 를 반 칸 블록 줄로 (y 는 위가 큼)
+function blocks(w, h, px, indent = "  ") {
   const lines = [];
-  for (let r = 0; r < N; r += 2) {
-    let line = "  ";
-    for (let k = 0; k < N; k++) {
-      const x = k - R, top = px(x, R - r), bot = r + 1 < N ? px(x, R - r - 1) : null;
+  for (let r = 0; r < h; r += 2) {
+    let line = indent;
+    for (let x = 0; x < w; x++) {
+      const top = px(x, r), bot = r + 1 < h ? px(x, r + 1) : null;
       if (!COLOR) line += top && bot ? "█" : top ? "▀" : bot ? "▄" : " ";
       else if (top && bot) line += `\x1b[38;2;${top.join(";")};48;2;${bot.join(";")}m▀\x1b[0m`;
       else if (top) line += `\x1b[38;2;${top.join(";")}m▀\x1b[0m`;
       else if (bot) line += `\x1b[38;2;${bot.join(";")}m▄\x1b[0m`;
       else line += " ";
     }
-    lines.push(line);
+    lines.push(line.replace(/\s+$/, ""));
   }
   return lines;
 }
 
+// 각도 a 의 한 장면. drip 이면 칼날에서 피가 떨어짐
+function frame(R, a, glint, drip) {
+  const c = Math.cos(a), s = Math.sin(a), k = 17.5 / R, N = 2 * R + 1;
+  const drops = drip ? [9.5, 12, 14.5].map((u, i) => {   // 날 끝 점의 화면 위치
+    const v = -1.25 + 1.8 * ((u + 2.5) / 19.5) ** 2;
+    return [Math.round((u * c - v * s) / k), Math.round((u * s + v * c) / k), 2 + i * 2];
+  }) : [];
+  return blocks(N, N, (x0, r) => {
+    const x = x0 - R, y = R - r;
+    const hit = part((x * c + y * s) * k, (-x * s + y * c) * k, glint);
+    if (hit) return hit;
+    for (const [dx, dy, len] of drops) if (x === dx && y < dy && y >= dy - len) return y === dy - len ? BLOOD : BLOOD_D;
+    return null;
+  });
+}
+
+// 7x5 픽셀 글꼴 (이름용)
+const GLYPH = {
+  C: [" ####", "#    ", "#    ", "#    ", "#    ", "#    ", " ####"],
+  H: ["#   #", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"],
+  A: [" ### ", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"],
+  N: ["#   #", "##  #", "##  #", "# # #", "#  ##", "#  ##", "#   #"],
+  G: [" ####", "#    ", "#    ", "# ###", "#   #", "#   #", " ### "],
+  U: ["#   #", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "],
+  J: ["  ###", "    #", "    #", "    #", "    #", "#   #", " ### "],
+  E: ["#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#####"],
+  O: [" ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "],
+  " ": ["  ", "  ", "  ", "  ", "  ", "  ", "  "],
+};
+
+// 이름: 강철 글자 (글자 한 칸 = 한 줄)
+// - cut 이면 베인 선 위쪽이 한 칸 밀리고 선에 피가 맺힘
+function nameArt(text, cut) {
+  const rows = [0, 1, 2, 3, 4, 5, 6].map((r) => [...text].map((ch) => GLYPH[ch][r]).join(" "));
+  const w = rows[0].length + 5, h = 14;
+  const slash = (x) => 10.5 - x * 7 / w;        // 베인 선 (왼쪽 아래에서 오른쪽 위)
+  return blocks(w, h, (x, y) => {
+    const gy = Math.floor(y / 2), above = cut && y < slash(x);
+    const sx = x - 2 - (above ? 1 : 0);          // 베인 위쪽은 한 칸 밀림
+    const on = rows[gy][sx] === "#";
+    if (!on) return null;
+    if (cut && Math.abs(y - slash(x)) < 0.7) return BLOOD;
+    if (cut && y > slash(x) && y < slash(x) + 3 && (x * 5) % 7 === 0) return BLOOD_D;   // 흘러내림
+    return mix(EDGE, SPINE, gy / 6);
+  });
+}
+
 function banner() {
-  const end = Math.PI / 9;                       // 멈춘 자세: 칼끝 위로 20도
-  const steps = COLOR ? 40 : 1;
+  const R = Math.max(14, Math.min(30, (process.stdout.rows || 34) - 6));   // 화면 높이에 맞춤
+  const end = Math.PI / 12;                      // 멈춘 자세: 칼끝 위로 15도
+  const steps = COLOR ? 44 : 0;          // 색이 없으면 돌지 않음
   console.log();
   if (COLOR) process.stdout.write("\x1b[?25l"); // 커서 숨김
   for (let i = 1; i <= steps; i++) {
     const t = i / steps, ease = 1 - (1 - t) ** 3;
-    const lines = frame(end - 4 * Math.PI * (1 - ease), -3 + 21 * t);
-    if (i < steps) process.stdout.write(lines.join("\n") + `\n\x1b[${lines.length}A`);
-    else process.stdout.write((COLOR ? "\x1b[J" : "") + lines.filter((l) => l.trim()).join("\n") + "\n\n");  // 빈 줄 제거
-    sleep(28);
+    const lines = frame(R, end - 4 * Math.PI * (1 - ease), -3 + 24 * t, i === steps);
+    process.stdout.write(lines.join("\n") + `\n\x1b[${lines.length}A`);
+    sleep(26);
+  }
+  // 멈춘 뒤 화면 폭까지 커지고 피가 떨어짐 (빈 줄은 뺌)
+  const Rf = Math.max(R, Math.min(46, Math.floor(((process.stdout.columns || 100) - 6) / 2.3)));
+  let up = 0;
+  for (let j = COLOR ? 1 : 8; j <= 8; j++) {
+    const lines = frame(Math.round(R + (Rf - R) * j / 8), end, 99, j === 8).filter((l) => l.trim());
+    process.stdout.write((up ? `\x1b[${up}A` : "") + (COLOR ? "\x1b[J" : "") + lines.join("\n") + "\n");
+    up = lines.length;
+    sleep(22);
+  }
+  console.log();
+  console.log(`  ${grad("村正", RED, [120, 10, 20])}  ${bold("M U R A M A S A")}  ${dim("伊勢国 桑名")}`);
+  console.log();
+  console.log(`  ${dim("crafted by")}`);
+  if ((process.stdout.columns || 100) >= 92) {    // 큰 이름: 먼저 온전히, 다음 베임
+    const whole = nameArt("CHANGHUN JEONG", false);
+    if (COLOR) {
+      process.stdout.write(whole.join("\n") + `\n\x1b[${whole.length}A`);
+      sleep(380);
+    }
+    process.stdout.write((COLOR ? "\x1b[J" : "") + nameArt("CHANGHUN JEONG", true).join("\n") + "\n");
+  } else {
+    console.log(`  ${grad("Changhun Jeong", EDGE, BLOOD)}`);
   }
   if (COLOR) process.stdout.write("\x1b[?25h");
-  console.log(`  ${grad("村正", RED, [120, 10, 20])}  ${bold("M U R A M A S A")}  ${dim("伊勢国 桑名")}`);
   const head = `${dim("─ ")}${bold("interx-deck")} `;
-  const ver = ` ${rgb(ORANGE, "1;")("v" + PKG.version)}${dim(" ─")}`;
-  const row = (s) => console.log(`  ${dim("│")} ${pad(s, W - 4)} ${dim("│")}`);
+  const ver = ` ${rgb(RED, "1;")("v" + PKG.version)}${dim(" ─")}`;
   console.log();
   console.log(`  ${dim("╭")}${head}${dim("─".repeat(Math.max(0, W - 2 - width(head) - width(ver))))}${ver}${dim("╮")}`);
-  row(`${dim("PPT engine for")} ${bold("Claude Code")}`);
-  row(`${dim("crafted by")}  ${grad("Changhun Jeong", [255, 190, 90], [236, 72, 153])}`);
+  console.log(`  ${dim("│")} ${pad(`${dim("PPT engine for")} ${bold("Claude Code")}`, W - 4)} ${dim("│")}`);
   console.log(`  ${dim("╰" + "─".repeat(W - 2) + "╯")}`);
   console.log();
 }
