@@ -1,4 +1,5 @@
-"""새 덱 출발점 (build.py 로 복사, 내용만 교체)"""
+"""새 덱 출발점 (build.py 로 복사, 내용만 교체)
+- 예시 과제: 설비 데이터 수집 시스템 (수치는 형식을 보이기 위한 값)"""
 import os
 import sys
 import tempfile
@@ -21,101 +22,110 @@ sys.path.insert(0, _engine())
 from ixdeck import *  # noqa: E402,F403
 
 d = Deck(author=profile_author() or "소속 / 이름 직급")  # 개인 설정 값. 덱마다 사용자에게 확인
-OUT = sys.argv[1] if len(sys.argv) > 1 else d.filename("INTERX덱예시", "0.1.0", tempfile.gettempdir())
-d.cover("예시 과제 결과 보고", "2026.11.05")      # 덱 기준일
+OUT = sys.argv[1] if len(sys.argv) > 1 else d.filename("설비 수집 진행 보고", "0.1.0", tempfile.gettempdir())
+d.cover("설비 데이터 수집 진행 보고", "2026.05.29")      # 덱 기준일
 
-d.section("과제 결과")
-s = d.page("핵심 수치 (예시 값)", lead="예시 수치 셋 및 구간별 건수를 한 장에 둠")
-top = banner(s, "기준 안 항목 15개, 검토 결함 22건 모두 고침", tags=["1단계", "2단계", "3단계"], current=1)
-a, b, c = cols = report_panels(s, ["핵심 수치", "구간별 건수", "검토 결함"], top=top,
-                               footnote="* 예시 값: 형식을 보이기 위한 수")
-(a.kpis([("15", "개", "기준 안 항목"), ("22", "건", "검토 결함")])   # 핵심 수치는 덱 본문의 1/5 장까지
-  .num_cards([("기준 안 항목", "전체 22개 중 15개가 0.2 미만")])
-  .formula(r"R = \frac{N_{기준}}{N} \times 100",   # 한 글자 기호, 기호마다 설명과 단위
-           where=["R: 기준 안 비율 (%)", "N_{기준}: 거리 0.2 in 미만 항목 (개)", "N: 전체 항목 (개)"]))
-(b.chart("col", ["0.1 미만", "0.1 ~ 0.2", "0.2 ~ 0.5", "0.5 이상"], {"건수": [7, 8, 3, 4]}, h=2.6,
-         highlight=(0, 1), number_format='0"개"')
-  .notes(["15개가 0.2 미만", "강조 막대는 기준 안 구간"]))
-(c.chart("bar", ["검토 1", "검토 2", "검토 3", "검토 4"], {"결함": [6, 9, 5, 2]}, h=2.6, number_format='0"건"')
-  .notes(["모두 22건, 모두 고침"]))
+# 요약 줄(lead)은 그 장의 결론. 본문은 근거만
+d.section("시험 결과 및 개선")
+s = d.page("수집 성능 (1 ~ 4차 시험)",
+           lead="4차 시험에서 검수 기준 2개를 모두 충족했고 1 ~ 4차 결함 22건은 조치 완료")
+a, b, c = cols = report_panels(s, ["검수 지표 (4차 시험)", "수집 지연 분포 (4차 시험)", "시험 회차별 발견 결함"])
+(a.kpis([("99.8", "%", "수집 성공률"), ("95.7", "%", "0.2초 이내 저장")])   # 핵심 수치는 덱 본문의 1/5 장까지
+  .formula(r"S = \frac{N_{저장}}{N_{수집}} \times 100",   # 한 글자 기호, 기호마다 뜻과 단위
+           where=["S: 수집 성공률 (%)", "N_{저장}: 데이터 저장소에 저장된 수집 회차 (86,227회)",
+                  "N_{수집}: 24시간 동안의 수집 회차 (86,400회)"])
+  .num_cards([("검수 기준", "수집 성공률 99.5% 이상, 0.2초 이내 저장 95% 이상"),
+              ("미저장 173회", "EdgePC 재시작 중 저장되지 않은 회차 (4차 결함 2건 중 1건, 조치 완료)")])
+  .notes(["수집 회차: 1초마다 설비 3대를 한 번 읽는 단위"]))
+(b.hist([0.04] * 61200 + [0.15] * 21300 + [0.3] * 3500 + [0.7] * 227, [0, 0.1, 0.2, 0.5, 1.0], unit=" 초",
+        name="수집 회차", count_unit="회", h=2.6, highlight=(0, 1))
+  .tab_box("지연 정의", ["수집 지연: 저장 시각에서 수집 시각을 뺀 값", "0.2초 이내 저장: 82,500회 / 86,227회 = 95.7%",
+                       "0.5초 초과 227회는 네트워크 재연결 구간"]))
+(c.chart("bar", ["1차 시험", "2차 시험", "3차 시험", "4차 시험"], {"결함": [6, 9, 5, 2]}, h=2.6,
+         number_format='0"건"')
+  .tab_box("주요 결함", ["2차 시험: 재연결 뒤 같은 값 중복 저장 4건", "3차 시험: 보관 큐 재전송 순서 오류 3건"])
+  .notes(["결함 수: 시험 결과서 기준"]))
 for col in cols:
     col.done()
 
-s = d.page("현행 및 개선 비교 (예시)", lead="같은 항목을 두 표로 나란히 두고 바뀐 줄만 강조함")
-a, b = cols = report_panels(s, ["현행", "개선"], widths=(5.9, 5.9))
-rows_a = [["항목", "값"], ["양식", "개인 양식"], ["글꼴", "여러 글꼴"], ["글자 크기", "9.5 ~ 12pt"],
-          ["연결선", "도형에 안 붙음"], ["번호 설명", "아래 범례 줄"]]
-rows_b = [["항목", "값"], ["양식", "회사 양식"], ["글꼴", "Noto Sans KR"], ["글자 크기", "6.35 ~ 8.16pt"],
-          ["연결선", "도형에 붙음"], ["번호 설명", "선 옆"]]
-(a.table(rows_a, ratio=[1.2, 2], row_h=0.32)
-  .rule_list("현행 문제", [("warning", "보는 PC 마다 다르게 보임"), ("doc_check", "선을 옮기면 도형과 떨어짐"),
-                         ("checklist_green", "장마다 제목 꼴이 다름")], pitch=0.42)
-  .notes(["예시 값"]))
-(b.table(rows_b, ratio=[1.2, 2], row_h=0.32, highlight=(0, 1, 2, 3, 4))
-  .icon_cards([("monitor_gear", "같은 화면"), ("gears_cycle", "자동 배치"), ("chart_distribution", "검사 통과")])
-  .tab_box("바뀐 점", ["회사 양식 하나", "저장할 때 겹침 검사"])
-  .notes(["강조 줄은 바뀐 항목"]))
+s = d.page("현행 및 개선 비교", lead="6월 검수 뒤 수기 기록을 자동 수집으로 바꾸면 기록 간격이 1일에서 1초로 단축")
+a, b = cols = report_panels(s, ["현행 (수기 기록)", "개선 (자동 수집)"], widths=(5.9, 5.9), arrows=True)
+rows_a = [["항목", "내용"], ["기록 방식", "작업자가 설비별 PC 파일에 직접 입력"], ["기록 간격", "1일"], ["누락 확인", "월말 대조"],
+          ["데이터 위치", "설비별 PC"]]
+rows_b = [["항목", "내용"], ["기록 방식", "PLC 값 자동 수집"], ["기록 간격", "1초"], ["누락 확인", "5분 이상 누락 시 메일"],
+          ["데이터 위치", "중앙 서버 데이터 저장소"]]
+(a.table(rows_a, ratio=[1, 2.2], row_h=0.32)
+  .rule_list("현행 문제", [("warning", "기록 값을 다음 날에야 확인"), ("warning_orange", "누락이 월말에야 드러남"),
+                         ("warning_navy", "설비마다 파일 위치가 다름")], pitch=0.5)
+  .notes(["현행 기준: 2026년 1월 현장 확인"]))
+(b.table(rows_b, ratio=[1, 2.2], row_h=0.32)
+  .tab_box("6월 검수 후 바뀌는 업무", ["기록 값을 수집 1초 뒤 데이터 저장소에서 조회", "5분 이상 누락되면 담당자가 메일로 확인",
+                                  "설비별 파일 대신 중앙 서버 데이터 저장소에서 조회"])
+  .num_cards([("적용 범위", "설비 3대, 수집 항목 120개 (3대 합계)"), ("알림 수신", "누락: 생산기술팀 설비 담당자 2명, 현황 보고 5분 이상 끊김: 정보팀 운영 담당자 1명")]))
 for col in cols:
     col.done()
 
 d.section("일정 및 방법")
-s = d.page("단계별 일정 (예시)", lead="막대 색은 끝남 회색, 진행 남색, 예정 남회색이고 마름모는 마일스톤임")
+s = d.page("단계별 일정 (2026년)", lead="구현 및 시험을 마치고 현장 적용 중이며 6월 15일 현장 검수 예정")
 (a,) = cols = report_panels(s, ["단계별 일정"], widths=(12.8,))
-a.chevrons(["1단계 요구 및 설계", "2단계 구현 및 시험", "3단계 현장 적용"], current=1)
 a.gantt(["1월", "2월", "3월", "4월", "5월", "6월"],
-        [("요구 정리", 0, 1, "done", "끝남"), ("설계", 0.5, 2, "done", "끝남"), ("구현", 1.5, 4, "now", "진행"),
-         ("시험", 3.5, 5, "plan"), ("현장 적용", 4.5, 6, "plan"), ("검수", 5.5, 0, "mile", "검수")],
-        row_h=0.5, label_w=2.4, today=2.6).notes(["예시 일정"])
+        [("요구 정리", 0, 1, "done", "완료"), ("설계", 0.5, 2, "done", "완료"), ("구현", 1.5, 3.5, "done", "완료"),
+         ("시험 (1 ~ 4차)", 3, 4.6, "done", "완료"), ("현장 적용", 4.6, 5.6, "now", "진행"),
+         ("현장 검수", 5.5, 0, "mile", "6/15 검수")],
+        row_h=0.5, label_w=2.4, today=4.95).notes(["기준일 2026.05.29 (빨간 점선)"])
 a.done()
 
-s = d.page("진행 방법 (예시)", lead="단계마다 입력, 방법, 확인을 목록으로 둠")
-a, b, c = cols = report_panels(s, ["입력", "방법", "확인"], arrows=True)   # 순서가 있을 때만 화살표
-(a.section("받는 자료", ["장 구성", "장마다 할 말 한 줄", "근거 자료 경로"], row_h=0.38)
-  .section("먼저 묻는 것", ["작성자 정보"], row_h=0.38, highlight=(0,))
-  .rule_list("자료 기준", [("doc_check", "원천 명칭 그대로"), ("checklist_green", "확인한 사실만")])
-  .notes(["예시 목록"]))
-(b.section("배치", ["패널, 열, 여백", "묶음 안 상자 자리", "줄 높이"], row_h=0.32)
-  .section("선과 번호", ["변 및 꺾임", "선 다발", "번호 자리"], row_h=0.32)
-  .section("글꼴 및 크기", ["Noto Sans KR 하나", "기본 양식 글자 크기"], row_h=0.32)
-  .notes(["모두 자동"]))
-(c.section("검사", ["겹침 및 넘침", "제목 번호", "글꼴 및 크기"], row_h=0.38)
-  .section("넘기기 전", ["렌더 그림 확인", "사실 검토 1건"], row_h=0.38, highlight=(1,))
-  .section("고칠 때", ["build.py 를 고쳐 다시 실행", "PowerPoint 로 연 파일은 넘기지 않음"], row_h=0.38)
-  .notes(["gate.py 한 줄"]))
+s = d.page("진행 방법", lead="수집 항목 정의서를 받아 1초 수집을 구현하고 저장 회차 및 수집 지연으로 검증")
+a, b, c = cols = report_panels(s, ["받은 자료 및 현장 확인", "구현", "검증"], arrows=True)   # 순서가 있을 때만 화살표
+(a.section("현업에서 받은 자료", ["수집 항목 정의서 (2026.01.09)", "현장 네트워크 구성도 (2026.01.16)"],
+           row_h=0.38)
+  .section("정의서 내용", ["설비별 PLC 주소", "수집 항목 이름 및 단위 (3대 합계 120개)"], row_h=0.38)
+  .tab_box("현장 확인 결과", ["PLC 통신: Ethernet, Modbus TCP", "EdgePC 와 중앙 서버 사이 방화벽 개방 (2026.02.03)"])
+  .notes(["웹 화면의 항목 이름은 수집 항목 정의서 명칭과 같음"]))
+(b.section("수집", ["중앙 서버가 수집 계획 (PLC 주소, 항목 목록) 전달", "PLC 값을 1초마다 읽고 수집 시각 기록"],
+           row_h=0.38)
+  .section("전송", ["중앙 서버로 전송 (사본은 EdgePC CSV 에 7일)", "실패분은 보관 후 다시 전송"], row_h=0.38)
+  .section("현황", ["수집 프로그램 현황을 1분마다 보고"], row_h=0.38)
+  .section("알림", ["5분 이상 누락되면 설비 담당자에게 메일", "현황 보고가 5분 이상 끊기면 운영 담당자에게 메일"], row_h=0.38))
+(c.section("시험", ["24시간 연속 수집", "수집 회차 대비 저장 회차 대조", "수집 지연 (저장 시각 - 수집 시각) 측정"], row_h=0.38)
+  .section("현장 검수 (6월 15일)", ["현업 담당자와 설비 화면 값 및 웹 화면 값 대조", "누락 알림 동작 확인"], row_h=0.38)
+  .tab_box("검수 기준", ["수집 성공률 99.5% 이상", "0.2초 이내 저장 95% 이상"])
+  .section("기록", ["시험 결과서 및 검수 확인서 작성"], row_h=0.38))
 for col in cols:
     col.done()
 
 d.section("시스템 구성")
-s = d.page("수집 구성 (예시)", doc=True)
+s = d.page("수집 구성 (설비 3대 기준)", doc=True,
+           lead="설비 3대의 PLC 값을 EdgePC 가 1초마다 읽어 중앙 서버 데이터 저장소로 전송")
 g = DocGrid(s, right=None, rows=7, bottom=6.3)
 g.source("source", [("plc", "설비 1"), ("plc", "설비 2"), ("plc", "설비 3")], title="설비 PLC")
 plcs = g.icons
 e = g.group("edge", "EdgePC", kind="edge", sub="설비 옆", header="수집 프로그램", cols=2, area=False)
 s1 = e.sub(0, 0, 6, header="수집 및 보고")
-cache, core = s1.box(1, "수집 계획 캐시"), s1.box(3, "수집 코어")
-report, alarm = s1.box(5, "현황 보고"), s1.box(6, "알림 메일 보내기")
+cache, core = s1.box(1, "수집 계획 보관"), s1.box(3, "수집 코어")
+report, alarm = s1.box(5, "현황 보고"), s1.box(6, "알림 메일 발송")
 s2 = e.sub(1, 0, 4, header="저장 및 전송")
 csv, send, spool = s2.box(2, "CSV 기록"), s2.box(3, "송신"), s2.box(4, "보관 큐")
 p = g.group("platform", "중앙 서버", header="관리 서버", cols=2, area=False)
 s3 = p.sub(0, 0, 6, header="수집 관리")
-plan, status = s3.box(1, "수집 계획 제공"), s3.box(5, "수집기 현황")
-srv_alarm = s3.box(6, "서버 알림")
+plan, status = s3.box(1, "수집 계획 제공"), s3.box(5, "수집 프로그램 현황")
+srv_alarm = s3.box(6, "보고 끊김 감지")
 s4 = p.sub(1, 0, 3, header="저장 및 화면")
-db_, web = s4.box(1, "DB"), s4.box(3, "웹 화면")
+db_, web = s4.box(1, "설정 DB"), s4.box(3, "웹 화면")
 lake = g.bar("platform", "데이터 저장소")
 mail = g.bar("edge", "메일 서버", fill=GRAY)
 link(s, plan, cache, color=TEAL, text="HTTPS", step=(1, "계획 받기"))
 fan(s, core, plcs, color=ACCENT, step=(2, "PLC 읽기"))
 link(s, core, csv, color=ACCENT, step=(3, "기록"))
 link(s, core, send, color=ACCENT)
-link(s, send, lake, color=ACCENT, text="HTTP", step=(4, "전송"))
-link(s, send, spool, color=RED, dash="sysDot", step=(5, "실패분 보관"))
+link(s, send, lake, color=ACCENT, text="HTTPS", step=(4, "전송"))
+link(s, send, spool, color=RED, dash="sysDot", step=(5, "실패분 보관"), head="both")   # 보관 뒤 다시 전송
 link(s, report, status, color=GRAY, step=(6, "현황 보고"))
-link(s, alarm, mail, color=GRAY, step=(7, "알림 메일"))
-link(s, srv_alarm, mail, color=GRAY, step=(8, "서버 알림 메일"))
+link(s, alarm, mail, color=GRAY, step=(7, "누락 알림 메일"))
+link(s, srv_alarm, mail, color=GRAY, step=(8, "보고 끊김 메일"))
 link(s, plan, db_, color=GRAY, head="both")
 link(s, web, db_, color=GRAY, head="both")
-note_by(s, web, "설명은 설명하는 상자 옆에", ["오른쪽 여백에 설명 열을 따로 두지 않음"])
+note_by(s, web, "수집 계획 및 수집 프로그램 현황 조회")   # 설명은 가리키는 상자 옆
 
 d.save(OUT)
 print(OUT)

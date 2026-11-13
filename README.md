@@ -14,6 +14,8 @@ npx --allow-git=all muramasaDev/interx-deck-skill
 - 업데이트: 같은 명령 (항상 최신 판). 설치 화면에 `업데이트 1.4.0 → 1.4.1` 처럼 판 번호가 나온다
 - 특정 판: 명령 끝에 `#v1.4.1` (판 목록은 저장소 Tags, 바뀐 점은 CHANGELOG.md)
 - 최신 판 번호만 보기: 명령 끝에 `--version`
+- 설치 점검: 명령 끝에 `doctor` (엔진 시험과 예제 덱 관문, 렌더와 PDF 까지 2 ~ 4분). Mac 에서 처음 쓸 때 한 번
+- 새 판이 나오면 Claude Code 를 켤 때 한 줄로 알림 (하루 한 번 확인)
 - 제거: 명령 끝에 `uninstall`
 - 저장소 읽기 권한이 필요하다
 - Windows 와 Mac. 렌더 확인과 PDF 는 PowerPoint (Mac 은 PowerPoint 가 없으면 LibreOffice, 줄 바꿈이 조금 다를 수 있음)
@@ -31,7 +33,7 @@ Claude Code 에서 말로 요청한다. 덱마다 작성자, 파일명, 버전�
 | `/interx-deck:using` | 무엇을 쓸지 모를 때 | |
 
 - 결과: 작업 폴더(또는 말한 폴더)에 pptx 와 PDF 가 같은 이름으로 생긴다
-  - 이름: `날짜_파일명_작성자_버전`
+  - 이름: `제목_작성자_버전_날짜` (날짜는 YYMMDD)
 - 고칠 때: "3장 표를 아래로" 처럼 말로 요청하거나 PowerPoint 에서 직접 고친다
 - OKR 은 지난달 덱 파일을 함께 준다
 

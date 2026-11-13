@@ -57,10 +57,14 @@ def main():
         print("== 3. 금지 표현\n" + out.strip())
         if rc:
             fails.append("금지 표현")
+    rc, out = run([sys.executable, "-P", os.path.join(HERE, "check_text.py"), pptx])
+    print("== 3-2. 문장 (주의는 읽고 판단)\n" + out.strip())
+    if rc:
+        fails.append("문장")
     name = os.path.splitext(os.path.basename(pptx))[0]
     img = os.path.join(tempfile.gettempdir(), "interx_gate", name)
     os.makedirs(img, exist_ok=True)
-    for old in glob.glob(os.path.join(img, "*.png")):  # 예전 덱 그림이 섞이지 않게
+    for old in glob.glob(os.path.join(img, "*.png")) + glob.glob(os.path.join(img, "text.md")):  # 예전 것 섞임 방지
         os.remove(old)
     pdf = os.path.splitext(pptx)[0] + ".pdf"   # 결과물: pptx 옆에 같은 이름
     rc, out = run([sys.executable, "-P", os.path.join(HERE, "render.py"), pptx, img, "--pdf", pdf])
@@ -78,6 +82,11 @@ def main():
                 sheet.paste(im.resize((W, H)), ((k % cols) * W, (k // cols) * H))
         sheet.save(os.path.join(img, "sheet.png"))
         print(f"== 4. 렌더 {len(pngs)}장: {img} (모아 보기 sheet.png). 장마다 SKILL.md '장 검토 목록' 으로 본다")
+        rc, out = run([sys.executable, "-P", os.path.join(HERE, "deck_text.py"), pptx, os.path.join(img, "text.md")])
+        if rc:
+            fails.append("글 뽑기")
+            print("== 5. 글 뽑기 실패\n" + out.strip()[-500:])
+        print(f"== 5. 글 검토: {os.path.join(img, 'text.md')} 와 sheet.png 로 using SKILL '사람이 쓴 덱 검토'")
         print(f"== 파일: {pptx}")
         print(f"         {pdf}")
     print("결과: " + ("실패 " + ", ".join(fails) if fails else "통과"))

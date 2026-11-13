@@ -1,6 +1,6 @@
 {
   "name": "@muramasadev/interx-deck",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "INTERX 회사 양식 PPT 플러그인 for Claude Code",
   "bin": {
     "interx-deck": "bin/install.js"
@@ -10,6 +10,8 @@
     "skills/",
     "scripts/*.py",
     "scripts/*.ps1",
+    "scripts/*.js",
+    "hooks/",
     "assets/",
     "bin/",
     "README.md",

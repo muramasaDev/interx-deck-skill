@@ -218,7 +218,7 @@ assert layout_problems(complex_slide) == [], layout_problems(complex_slide)
 d.save(out, strict=False)
 _d = Deck(author="소속 / 홍길동 연구원")   # 파일 이름 규칙
 _n = _d.filename("과제 이름_예시", "v0.9.0", "x", datetime.date(2026, 1, 2))
-assert os.path.basename(_n) == "20260102_과제이름예시_홍길동_v0.9.0.pptx", _n
+assert os.path.basename(_n) == "과제_이름_예시_홍길동_v0.9.0_260102.pptx", _n
 f = Deck(author="시험", forbid=[r"192\.168\.\d+\.\d+"])   # forbid 가 저장을 막아야 함
 f.cover("시험", "2026.11.10")
 f.section("시험")

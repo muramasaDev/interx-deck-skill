@@ -844,6 +844,8 @@ def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="
     pal = colors or PALETTE
     for i, ser in enumerate(plot.series):
         c = pal[i % len(pal)]
+        if highlight and len(series) == 1 and kind != "line":   # 강조 막대만 남색, 나머지 회색
+            c = SLATE4
         if kind == "line":
             ser.format.line.color.rgb = _rgb(c)
             ser.format.line.width = Pt(1.5)
@@ -864,6 +866,60 @@ def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="
     _chart_font(ch)
     _obst(s, gf)
     return gf
+
+
+def _axis_title(ax, t):
+    ax.has_title = True
+    ax.axis_title.text_frame.text = t
+    for r in ax.axis_title.text_frame.paragraphs[0].runs:
+        r.font.size, r.font.bold, r.font.name = Pt(7.26), False, FONT
+        r.font.color.rgb = _rgb(SLATE9)
+
+
+def scatter_chart(s, x, y, w, h, series, x_title, y_title, x_format="0.0", y_format="0.0"):
+    """편집 가능한 산점도. series={이름: [(x, y), ...]}, 축 이름에 단위"""
+    from pptx.chart.data import XyChartData
+    from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_MARKER_STYLE
+    cd = XyChartData()
+    for name, pts in series.items():
+        ser = cd.add_series(name)
+        for px_, py_ in pts:
+            ser.add_data_point(px_, py_)
+    gf = s.shapes.add_chart(XL_CHART_TYPE.XY_SCATTER, Inches(x), Inches(y), Inches(w), Inches(h), cd)
+    ch = gf.chart
+    ch.has_title = False
+    ch.font.size, ch.font.name = Pt(7.26), FONT
+    ch.has_legend = len(series) > 1
+    if ch.has_legend:
+        ch.legend.position, ch.legend.include_in_layout = XL_LEGEND_POSITION.BOTTOM, False
+    for ax, t, f in ((ch.category_axis, x_title, x_format), (ch.value_axis, y_title, y_format)):
+        ax.tick_labels.number_format, ax.tick_labels.number_format_is_linked = f, False
+        ax.tick_labels.font.size = Pt(7.26)
+        ax.format.line.color.rgb = _rgb(GRAY_L)
+        ax.has_major_gridlines = ax is ch.value_axis
+        _axis_title(ax, t)
+    ch.value_axis.major_gridlines.format.line.color.rgb = _rgb(LINE_L)
+    from pptx.enum.chart import XL_AXIS_CROSSES
+    xs = [p_[0] for pts in series.values() for p_ in pts]
+    ch.category_axis.minimum_scale, ch.category_axis.maximum_scale = math.floor(min(xs)), math.ceil(max(xs))
+    ch.category_axis.crosses = ch.value_axis.crosses = XL_AXIS_CROSSES.MINIMUM   # 축은 왼쪽, 아래
+    for i, ser in enumerate(ch.plots[0].series):
+        ser.format.line.fill.background()
+        ser.marker.style, ser.marker.size = XL_MARKER_STYLE.CIRCLE, 4
+        ser.marker.format.fill.solid()
+        ser.marker.format.fill.fore_color.rgb = _rgb(PALETTE[i % len(PALETTE)])
+        ser.marker.format.line.fill.background()
+    _chart_font(ch)
+    _obst(s, gf)
+    return gf
+
+
+def hist_bins(values, edges, unit=""):
+    """히스토그램 구간 이름과 건수. edges 는 경계 목록"""
+    cats = [f"{a:g} ~ {b:g}{unit}" for a, b in zip(edges, edges[1:])]
+    counts = [sum(1 for v in values if a <= v < b or (k == len(edges) - 2 and v == b))
+              for k, (a, b) in enumerate(zip(edges, edges[1:]))]
+    return cats, counts
 
 
 def screenshot(s, path, x, y, w, h, marks=(), color=RED):
@@ -1032,7 +1088,7 @@ def step_badge(s, gx0, gx1, cy, icon_key, label_, top=None):
     text(s, gx0 + 0.02, cy + 0.26, lw, 0.16 * len(lines) + 0.04, lines, size=8, bold=True, color=SLATE9, align="c")
 
 
-def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None):
+def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None, today_label="기준일"):
     """일정 표. kind: done, now, plan, mile"""
     if not periods or not tasks:
         raise ValueError("gantt: 기간이나 항목이 없음")
@@ -1070,7 +1126,7 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None):
     if today is not None:
         tx = x + label_w + today * pw
         box(s, tx, y + hh, 0.001, body_h, fill=None, line=RED, lw=1, dash="dash")
-        text(s, tx - 0.3, y + hh + body_h + 0.02, 0.6, 0.18, "오늘", size=6.35, bold=True, color=RED, align="c")
+        text(s, tx - 0.3, y + hh + body_h + 0.02, 0.6, 0.18, today_label, size=6.35, bold=True, color=RED, align="c")
     return y + hh + body_h
 
 
@@ -1173,6 +1229,8 @@ def ko_breaks(text, width, size):
             cut = None
             for m in re.finditer(r",\s+", rest):
                 head = rest[:m.start() + 1]
+                if head.count("(") > head.count(")"):   # 괄호 안 쉼표에서는 끊지 않음
+                    continue
                 wh = _text_w(head, size)
                 if wh <= width and wh >= width * 0.45:
                     cut = m
@@ -1448,6 +1506,16 @@ class Col:
             return chart(self.s, self.x, y + th, self.w, h + r, kind, categories, series, **kw)
         return self._add(h + th, draw, rows=1, room=1.2)
 
+    def scatter(self, series, x_title, y_title, h=2.2, **kw):
+        """산점도 블록. 축 이름에 단위 (예: '목표 두께 (µm)')"""
+        return self._add(h, lambda y, r: scatter_chart(self.s, self.x, y, self.w, h + r, series, x_title, y_title,
+                                                       **kw), rows=1, room=1.2)
+
+    def hist(self, values, edges, name="건수", unit="", count_unit="건", h=1.9, **kw):
+        """히스토그램 블록 (편집 가능한 세로 막대)"""
+        cats, counts = hist_bins(values, edges, unit)
+        return self.chart("col", cats, {name: counts}, h=h, number_format=f'#,##0"{count_unit}"', **kw)
+
     def icon_cards(self, items, card=0.46):
         """아이콘 카드 줄"""
         return self._add(card + 0.12, lambda y, r: icon_cards(self.s, self.x, y, self.w, items, card=card))
@@ -1511,7 +1579,8 @@ class Col:
 
     def tab_box(self, label, lines, color=ACCENT):
         """왼쪽 위 이름표 묶음. lines=[글, ...]"""
-        if not label.strip() or re.search(r"(함|됨|듦|했음|있음|없음|하기|한다|된다|이다)$", label.strip()):
+        last = (label.split() or [""])[-1]   # 결함, 포함 같은 두 글자 명사는 통과
+        if not last or re.search(r"[가-힣]{2}(함|됨|듦)$|(했음|있음|없음|하기|한다|된다|이다)$", last):
             _warn(self.s, f"이름표 '{label}' 는 명사로 (예: '결론', '예측 대상')")
         w = self.w - 0.32
         body_txt = lambda: sum(_nl("• " + ln, w, 8) for ln in lines) * _lh(8)
@@ -1575,7 +1644,8 @@ class Col:
         w = self.w - 0.3
         h = 0.16 + (_lh(9) if name else 0) + sum(_lh(12) * (2.5 if "\\sum_" in e or "\\sum^" in e else 1.9 if "\\frac" in e else 1.2)
                                                        for e in exprs) \
-            + ((1 + sum(_nl(_linear(x_), w, 7.26) for x_ in where)) * _lh(7.26) + 0.04 if where else 0)
+            + ((1 + sum(_nl(_linear(x_), w, 7.26) + (0.35 if "_" in x_.split(":")[0] else 0) for x_ in where))
+               * _lh(7.26) + 0.06 if where else 0)   # 첨자 기호 줄은 높음
 
         def draw(y, r):
             body = box(self.s, self.x, y, self.w, h, fill="F7F8FB", line=GRAY_L, lw=0.75)
@@ -2413,6 +2483,16 @@ PROFILE_DIR = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(o
                            "interx-deck", "profile")   # 개인 설정 (플러그인 밖)
 
 
+def _template_fresh(template):
+    """회사 양식 원본(template_source)이 더 새로우면 알림"""
+    import json
+    p = os.path.join(PROFILE_DIR, "profile.json")
+    src = json.load(open(p, encoding="utf8")).get("template_source") if os.path.exists(p) else None
+    if src and os.path.exists(src) and os.path.getmtime(src) > os.path.getmtime(template):
+        print(f"주의: 회사 양식 원본이 템플릿보다 새로움. python -P {os.path.join(HERE, 'make_template.py')} "
+              f'"{src}" "{template}" 로 다시 만듦')
+
+
 def profile_author():
     """profile.json 작성자. 없으면 None"""
     import json
@@ -2439,25 +2519,38 @@ def save_profile_author(team, name, title):
 class Deck:
     """템플릿에 새 장 추가"""
 
-    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=()):
-        """parts_only: 본문만. forbid: 덱에 나가면 안 되는 정규식"""
+    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=(), allow=()):
+        """parts_only: 본문만. forbid: 덱에 나가면 안 되는 정규식
+        - allow: 검사에서 뺄 정규식 (화면 문구 그대로 옮긴 글 등)"""
         self.parts_only = parts_only
         self.forbid = [re.compile(p) for p in forbid]
+        self.allow = list(allow)
+        for p in self.allow:   # 빈 글에 맞는 정규식은 모든 글을 지움
+            if not p or re.compile(p).fullmatch(""):
+                raise ValueError(f"allow 정규식 '{p}' 이 빈 글에도 맞음: 범위를 좁힘")
         if not author or not author.strip():
             raise ValueError("작성자 정보가 없음: 사용자에게 먼저 물어 Deck(author=...) 로 넘김")
         self.author = author.strip()
+        _template_fresh(template)
         self.prs = Presentation(template)
         self.prs.core_properties.author = self.author
         self.prs.core_properties.last_modified_by = self.author
+        if self.allow:   # 검사 도구가 읽음
+            self.prs.core_properties.keywords = "ix-allow:" + __import__("json").dumps(self.allow, ensure_ascii=False)
         self._lib = list(self.prs.slides._sldIdLst)
         self.layouts = {l.name: l for l in self.prs.slide_masters[0].slide_layouts}
 
     def filename(self, title, version, folder=".", date=None):
-        """규칙 이름 YYYYMMDD_파일명_작성자_v버전.pptx"""
-        name = self.author.split("/")[-1].split()[0]
-        title = re.sub(r'[\s_\\/:*?"<>|]+', "", title)
-        day = (date or datetime.date.today()).strftime("%Y%m%d")
-        return os.path.join(folder, f"{day}_{title}_{name}_v{str(version).lstrip('v')}.pptx")
+        """규칙 이름 제목_작성자_v버전_YYMMDD.pptx (띄어쓰기는 밑줄)"""
+        last = self.author.split("/")[-1].strip()
+        if "/" not in self.author or not last:
+            raise ValueError(f"작성자 '{self.author}' 는 '소속 / 이름 직급' 꼴이어야 파일 이름을 만듦")
+        name = last.split()[0]
+        title = re.sub(r"[\s_]+", "_", re.sub(r'[\\/:*?"<>|]+', "", title)).strip("_")
+        if not title:
+            raise ValueError("파일 제목이 비어 있음")
+        day = (date or datetime.date.today()).strftime("%y%m%d")
+        return os.path.join(folder, f"{title}_{name}_v{str(version).lstrip('v')}_{day}.pptx")
 
     def lib(self, n):
         """템플릿 n 번째 장 (부품 원본)"""
@@ -2479,6 +2572,8 @@ class Deck:
         """표지. 날짜는 덱 기준일 (자동 아님)"""
         if not date:
             raise ValueError("cover: 덱 기준일을 넣는다 (예 '2026.11.04')")
+        if sum(_em(c) for c in title) > 16.5:   # 실측: 한 줄은 한글 약 15자
+            raise ValueError(f"표지 제목 '{title}' 이 한 줄을 넘어 날짜를 가림: 줄임")
         s = self._add("3_사용자 지정 레이아웃", keep=(10, 11))
         s.placeholders[10].text_frame.text = title
         s.placeholders[11].text_frame.text = date
@@ -2643,6 +2738,8 @@ class Deck:
 
     def save(self, path, strict=True):
         """저장. strict 면 문제가 있을 때 멈춤"""
+        if os.environ.get("INTERX_OUT_DIR"):   # 회귀 시험: 원래 결과물을 덮지 않음
+            path = os.path.join(os.environ["INTERX_OUT_DIR"], os.path.basename(path))
         if not hasattr(self, "_toc") and not self.parts_only:
             raise ValueError("표지가 없음: d.cover(제목, 날짜) 로 시작 (표지 뒤 목차가 따라 붙음)")
         if not getattr(self, "_closed", False) and not self.parts_only:

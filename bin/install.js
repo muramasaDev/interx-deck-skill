@@ -12,7 +12,7 @@ const PKG = require(path.join(SRC, "package.json"));
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 const DEST = path.join(CLAUDE, "skills", "interx-deck");
 const MARK = ".installed-by-npm";
-const ITEMS = [".claude-plugin", "skills", "scripts", "assets", "README.md", "CHANGELOG.md"];
+const ITEMS = [".claude-plugin", "hooks", "skills", "scripts", "assets", "README.md", "CHANGELOG.md"];
 
 const COLOR = (process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
 const paint = (code) => (s) => (COLOR ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -306,12 +306,35 @@ function checks() {
   renderer();
 }
 
+// 설치본 점검: 엔진 자체 시험, 예제 덱 관문 (렌더와 PDF 포함)
+function doctor() {
+  const py = findPython();
+  if (!py) fail("Python 3.11 이상이 없음: 먼저 설치 명령 실행");
+  const root = fs.existsSync(path.join(DEST, "scripts", "gate.py")) ? DEST : SRC;
+  const mark = path.join(root, MARK);
+  step("설치본", true, `${fs.existsSync(mark) ? fs.readFileSync(mark, "utf8").trim() : PKG.version} (${root})`);
+  const env = { ...process.env, PYTHONIOENCODING: "utf-8" };
+  const exec = (args) => require("child_process").spawnSync(`${py} -P ${args}`, { shell: true, env, encoding: "utf8" });
+  const tail = (r) => ((r.stdout || "") + (r.stderr || "")).trim().split("\n")
+    .filter((l) => !/^주의/.test(l)).slice(-14).join("\n    ");
+  const self = exec(`"${path.join(root, "scripts", "selfcheck.py")}" "${path.join(os.tmpdir(), "ixdoctor.pptx")}"`);
+  if (self.status === 0) step("엔진 시험", true, "통과");
+  else step("엔진 시험", false, "실패\n    " + tail(self));
+  busy("예제 덱 관문 (렌더 포함, 2 ~ 4분)");
+  const gate = exec(`"${path.join(root, "scripts", "gate.py")}" "${path.join(root, "scripts", "example_build.py")}"`);
+  if (gate.status === 0) step("예제 덱 관문", true, "통과 (렌더, PDF 포함)");
+  else step("예제 덱 관문", false, "실패\n    " + tail(gate));
+  if (self.status || gate.status) process.exitCode = 1;
+}
+
 const cmd = process.argv[2] || "install";
 if (cmd === "--version" || cmd === "-v") {
   console.log(PKG.version);
 } else if (cmd === "install" || cmd === "uninstall") {
   banner();
   cmd === "install" ? install() : uninstall();
+} else if (cmd === "doctor") {
+  doctor();
 } else {
-  fail("사용: npx --allow-git=all muramasaDev/interx-deck-skill [install|uninstall|--version]");
+  fail("사용: npx --allow-git=all muramasaDev/interx-deck-skill [install|uninstall|doctor|--version]");
 }

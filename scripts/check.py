@@ -84,8 +84,8 @@ if (cx, cy) != (12192000, 6858000):
 slides = sorted((n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n)),
                 key=lambda n: int(re.findall(r"\d+", n)[0]))
 _stem = os.path.splitext(os.path.basename(path))[0]
-if not re.match(r"^\d{8}_[^_\s]+_[^_\s]+_v\d+\.\d+\.\d+$", _stem):
-    bad.append(f"파일 이름 '{_stem}' 이 규칙(YYYYMMDD_파일명_작성자_v0.1.0) 아님: d.filename(파일명, 버전)")
+if not re.match(r"^\S+_[^_\s]+_v\d+\.\d+\.\d+_\d{6}$", _stem):
+    bad.append(f"파일 이름 '{_stem}' 이 규칙(제목_작성자_v0.1.0_YYMMDD) 아님: d.filename(제목, 버전)")
 if want is not None and len(slides) != want:
     bad.append(f"장 수 {len(slides)} (기대 {want})")
 for n in slides:
