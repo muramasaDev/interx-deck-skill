@@ -29,7 +29,7 @@ const width = (s) => [...s.replace(/\x1b\[[0-9;]*m/g, "")].reduce((n, ch) => n +
 const pad = (s, n) => s + " ".repeat(Math.max(0, n - width(s)));
 const grad = (s, a, b) => [...s].map((ch, i, all) => rgb(mix(a, b, i / Math.max(1, all.length - 1)), "1;")(ch)).join("");
 
-// 村正: 도는 카타나 (반 칸 블록, 정사각 픽셀)
+// 村正: 세로로 서서 모빌처럼 도는 카타나 (반 칸 블록, 정사각 픽셀)
 const W = 46;                  // 정보 카드 폭
 const SPINE = [96, 104, 118];  // 칼등
 const STEEL = [168, 178, 192];
@@ -42,29 +42,6 @@ const TSUBA = [24, 22, 26];
 const ITO = [120, 8, 20];      // 손잡이 끈 (붉은 실)
 const SAME = [20, 18, 22];     // 손잡이 가죽 (검정)
 const RED = [200, 30, 40];
-
-// 칼 좌표 (u 칼 방향, v 수직)의 색, 없으면 null
-// - 칼끝 u=17, 손잡이 끝 u=-9 (날 약 3.4배)
-function part(u, v, glint) {
-  if (u >= -2.5 && u <= 17) {                   // 칼날: 휨, 칼끝 좁힘, 물결 무늬, 피
-    const vb = v - 1.8 * ((u + 2.5) / 19.5) ** 2;
-    const half = u > 14 ? 1.25 * (17 - u) / 3 : 1.25;
-    if (Math.abs(vb) > half) return null;
-    if (Math.abs(u - glint) < 1) return [255, 255, 255];
-    if (u > 7 && vb < 0 && Math.sin(u * 2.7) + Math.cos(u * 1.3 + v) > 1.1) return u > 11 ? BLOOD : BLOOD_D;
-    if (vb > 0.45) return SPINE;
-    if (vb < -0.1 + 0.25 * Math.sin(u * 2.4)) return vb < -half + 0.3 ? HAMON : EDGE;
-    return STEEL;
-  }
-  if (u >= -3.3 && u < -2.5) return Math.abs(v) <= 1.5 ? GOLD : null;   // 하바키
-  if (u >= -4.3 && u < -3.3) return Math.abs(v) <= 3.2 ? TSUBA : null;  // 츠바
-  if (u >= -9 && u < -4.3) {                    // 손잡이, 마름모 무늬
-    if (Math.abs(v) > 1.4) return null;
-    if (u < -8.3) return GOLD;                  // 카시라
-    return Math.abs(((u * 1.3) % 2 + 2) % 2 - 1) > Math.abs(v) / 1.6 ? ITO : SAME;
-  }
-  return null;
-}
 
 // 픽셀 함수 px(x, y) 를 반 칸 블록 줄로 (y 는 위가 큼)
 function blocks(w, h, px, indent = "  ") {
@@ -84,20 +61,47 @@ function blocks(w, h, px, indent = "  ") {
   return lines;
 }
 
-// 각도 a 의 한 장면. drip 이면 칼날에서 피가 떨어짐
-function frame(R, a, glint, drip) {
-  const c = Math.cos(a), s = Math.sin(a), k = 17.5 / R, N = 2 * R + 1;
-  const drops = drip ? [9.5, 12, 14.5].map((u, i) => {   // 날 끝 점의 화면 위치
-    const v = -1.25 + 1.8 * ((u + 2.5) / 19.5) ** 2;
-    return [Math.round((u * c - v * s) / k), Math.round((u * s + v * c) / k), 2 + i * 2];
-  }) : [];
-  return blocks(N, N, (x0, r) => {
-    const x = x0 - R, y = R - r;
-    const hit = part((x * c + y * s) * k, (-x * s + y * c) * k, glint);
-    if (hit) return hit;
-    for (const [dx, dy, len] of drops) if (x === dx && y < dy && y >= dy - len) return y === dy - len ? BLOOD : BLOOD_D;
-    return null;
+// 세로로 선 카타나를 세로축으로 돌린 한 장면 (L: 길이 픽셀, phi: 돌린 각)
+// - 칼날은 판 (폭 3 픽셀, 두께 0.7), 손잡이 등은 원기둥, 츠바는 원판
+function katana(L, phi, glint) {
+  const pix = new Map();
+  const put = (x, y, z, c) => {
+    const k = `${Math.round(x)},${Math.round(y)}`, o = pix.get(k);
+    if (!o || z > o.z) pix.set(k, { z, c });
+  };
+  const cs = Math.cos(phi), sn = Math.sin(phi), face = Math.abs(cs);
+  const lit = (c, k) => c.map((v) => Math.min(255, Math.round(v * k)));
+  const b0 = L * 0.27;                                   // 칼날 시작 (아래에서)
+  for (let u = b0; u <= L; u += 0.25) {                  // 칼날: 휨, 칼끝, 물결 무늬, 피
+    const s = (u - b0) / (L - b0);
+    const half = s > 0.93 ? 1.5 * (1 - s) / 0.07 : 1.5 - 0.35 * s;
+    const c = 2.4 * s * s;                               // 휨 (칼등 쪽으로)
+    for (let v = -half; v <= half; v += 0.25) {
+      for (const w of [-0.35, 0.35]) {
+        const x = (c + v) * cs + w * sn, z = -(c + v) * sn + w * cs;
+        let col = v < -half * 0.62 + 0.2 * Math.sin(u * 0.9) ? HAMON : v > half * 0.4 ? SPINE : STEEL;
+        if (s > 0.5 && v < -half * 0.35 && Math.sin(u * 1.7) + Math.cos(u * 0.9) > 1.25) col = BLOOD;
+        const k = face > 0.93 && Math.abs(u - glint) < 2.5 ? 1.25 : 0.42 + 0.62 * face;   // 정면일수록 밝음
+        put(x, L - u, z, col === BLOOD ? col : lit(col, k));
+      }
+    }
+  }
+  const cyl = (u0, u1, r, color) => {                   // 원기둥: 가운데 밝게
+    for (let u = u0; u < u1; u += 0.5) {
+      for (let x = -r; x <= r; x += 0.25) put(x, L - u, 9, lit(color(u, Math.asin(x / r) + phi), 0.6 + 0.5 * Math.sqrt(1 - (x / r) ** 2)));
+    }
+  };
+  cyl(b0 - 1, b0, 1.9, () => GOLD);                     // 하바키
+  for (let x = -5; x <= 5; x += 0.25) {                 // 츠바 (원판, 옆에서 보면 띠)
+    for (const du of [1, 1.5, 2]) put(x, L - (b0 - du), 9, Math.abs(x) > 4.4 ? GOLD : TSUBA);
+  }
+  cyl(1.2, b0 - 2, 1.5, (u, th) => {                    // 손잡이: 돌면 마름모 무늬가 흐름
+    const a = (((u / 2.6 + th / Math.PI) % 1) + 1) % 1, b = (((u / 2.6 - th / Math.PI) % 1) + 1) % 1;
+    return Math.min(Math.abs(a - 0.5), Math.abs(b - 0.5)) < 0.17 ? ITO : SAME;
   });
+  cyl(0, 1.2, 1.7, () => GOLD);                         // 카시라
+  const X = 8;
+  return blocks(2 * X + 1, Math.ceil(L) + 1, (x0, y) => (pix.get(`${x0 - X},${y}`) || {}).c || null, " ".repeat(20));
 }
 
 // 7x5 픽셀 글꼴 (이름용)
@@ -132,26 +136,20 @@ function nameArt(text, cut) {
 }
 
 function banner() {
-  const R = Math.max(14, Math.min(30, (process.stdout.rows || 34) - 6));   // 화면 높이에 맞춤
-  const end = Math.PI / 12;                      // 멈춘 자세: 칼끝 위로 15도
-  const steps = COLOR ? 44 : 0;          // 색이 없으면 돌지 않음
+  const L = Math.max(30, Math.min(64, 2 * ((process.stdout.rows || 34) - 8)));   // 화면 높이에 맞춤
+  const end = 0.35;                              // 멈춘 자세: 칼날 면이 거의 정면
+  const steps = COLOR ? 72 : 0;                  // 색이 없으면 돌지 않음
   console.log();
   if (COLOR) process.stdout.write("\x1b[?25l"); // 커서 숨김
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps, ease = 1 - (1 - t) ** 3;
-    const lines = frame(R, end - 4 * Math.PI * (1 - ease), -3 + 24 * t, i === steps);
+  for (let i = 1; i <= steps; i++) {             // 모빌: 천천히 멎으며 몇 번 되돌아 흔들림
+    const t = i / steps;
+    const phi = end + 5 * Math.PI * (1 - t) ** 3 + 0.9 * Math.sin(5 * Math.PI * t) * t * (1 - t) ** 1.5;
+    const lines = katana(L, phi, L * (1.1 - t));
     process.stdout.write(lines.join("\n") + `\n\x1b[${lines.length}A`);
-    sleep(26);
+    sleep(34);
   }
-  // 멈춘 뒤 화면 폭까지 커지고 피가 떨어짐 (빈 줄은 뺌)
-  const Rf = Math.max(R, Math.min(46, Math.floor(((process.stdout.columns || 100) - 6) / 2.3)));
-  let up = 0;
-  for (let j = COLOR ? 1 : 8; j <= 8; j++) {
-    const lines = frame(Math.round(R + (Rf - R) * j / 8), end, 99, j === 8).filter((l) => l.trim());
-    process.stdout.write((up ? `\x1b[${up}A` : "") + (COLOR ? "\x1b[J" : "") + lines.join("\n") + "\n");
-    up = lines.length;
-    sleep(22);
-  }
+  const fin = katana(L, end, -9).filter((l) => l.trim());   // 빈 줄은 뺌
+  process.stdout.write((COLOR ? "\x1b[J" : "") + fin.join("\n") + "\n");
   console.log();
   console.log(`  ${grad("村正", RED, [120, 10, 20])}  ${bold("M U R A M A S A")}  ${dim("伊勢国 桑名")}`);
   console.log();
