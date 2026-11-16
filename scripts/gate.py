@@ -109,6 +109,9 @@ def check_deck(pptx, want):
     print("== 3-2. 문장 (주의는 읽고 판단)\n" + out.strip())
     if rc:
         fails.append("문장")
+    rc, out = run([sys.executable, "-P", os.path.join(HERE, "samples.py"), "check", pptx])
+    print("== 3-3. 사람 견본과 배치 수치 비교 (주의만)\n" + ("견본 비교 실행 실패 (관문 판정에는 넣지 않음)\n" if rc else "")
+          + out.strip()[-1500:])
     name = os.path.splitext(os.path.basename(pptx))[0]
     img = os.path.join(tempfile.gettempdir(), "interx_gate", name)
     os.makedirs(img, exist_ok=True)
@@ -147,6 +150,12 @@ def check_deck(pptx, want):
         print(f"== 4. 렌더 {len(pngs)}장: {img} (모아 보기 sheet.png). 장마다 SKILL.md '장 검토 목록' 으로 본다")
         print(f"   바뀐 장 {len(changed)}장 렌더" + (f" {changed}" if 0 < len(changed) < n else "")
               + f", 나머지 {n - len(changed)}장은 이전 그림 재사용. 걸린 시간 {time.time() - t0:.0f}초")
+        try:   # 지난 통과 때와 엔진 판이 다르면 바뀐 장을 눈으로 확인
+            prev = json.load(open(_record(pptx), encoding="utf8")).get("version")
+        except (OSError, ValueError):
+            prev = None
+        if prev and prev != _version():
+            print(f"   엔진 판 {prev} → {_version()}: 그림이 바뀐 장 {changed} 를 눈으로 확인 (같은 글인데 바뀌면 엔진 영향)")
         rc, out = run([sys.executable, "-P", os.path.join(HERE, "deck_text.py"), pptx, os.path.join(img, "text.md"),
                       os.path.join(img, "titles.md")])
         if rc:

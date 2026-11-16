@@ -8,7 +8,6 @@ import subprocess
 import sys
 import tarfile
 
-import resvg_py
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +32,7 @@ SET = {
     "circuit": ("p", "circuitry"), "router": ("t", "router"), "wifi": ("p", "wifi-high"),
     "broadcast": ("p", "broadcast"), "lan": ("p", "network"), "plugs_on": ("p", "plugs-connected"),
     "plugs": ("p", "plugs"), "plug": ("p", "plug"), "usb": ("p", "usb"), "cell_signal": ("p", "cell-signal-full"),
-    "firewall": ("t", "wall"), "shield_ok": ("p", "shield-check"), "shield_warn": ("p", "shield-warning"),
+    "firewall": ("p", "wall"), "shield_ok": ("p", "shield-check"), "shield_warn": ("p", "shield-warning"),
     "lock_key": ("p", "lock-key"), "key": ("p", "key"), "password": ("p", "password"),
     "fingerprint": ("p", "fingerprint"), "certificate": ("p", "certificate"), "seal_ok": ("p", "seal-check"),
     "globe": ("p", "globe"), "browser": ("p", "browser"), "code": ("p", "code"), "terminal": ("p", "terminal-window"),
@@ -90,6 +89,19 @@ def svg_of(roots, pk, name):
     return s.replace('stroke="currentColor"', f'stroke="{LINE}"').replace('stroke-width="2"', 'stroke-width="1.6"')
 
 
+def tint_inside(path):
+    """선만 있는 아이콘의 닫힌 안쪽을 청록 옅은 색으로 (Phosphor duotone 과 맞춤)"""
+    from PIL import ImageDraw as D
+    im = Image.open(path).convert("RGBA")
+    mask = Image.new("L", im.size, 0)
+    mask.paste(255, mask=im.split()[3].point(lambda a: 255 if a > 40 else 0))
+    D.floodfill(mask, (0, 0), 128)              # 바깥 = 128, 선 = 255, 닫힌 안쪽 = 0
+    inside = mask.point(lambda v: 90 if v == 0 else 0)
+    tint = Image.new("RGBA", im.size, TINT)
+    tint.putalpha(inside)
+    Image.alpha_composite(tint, im).save(path)
+
+
 def brand_svg(roots, slug):
     import json
     hexes = {d["slug"]: d["hex"] for d in json.load(open(os.path.join(roots["s"], "data", "simple-icons.json"),
@@ -118,14 +130,17 @@ def catalog(d=ICONS):
 
 
 if __name__ == "__main__":
+    import resvg_py
     roots = fetch(sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", ".icon_dl"))
     made = 0
     for key, (pk, name) in SET.items():
         out = os.path.join(ICONS, key + ".png")
         if os.path.exists(out):
             continue
-        png = resvg_py.svg_to_bytes(svg_string=svg_of(roots, pk, name), width=PX, height=PX)
-        open(out, "wb").write(bytes(png))
+        png = bytes(resvg_py.svg_to_bytes(svg_string=svg_of(roots, pk, name), width=PX, height=PX))
+        open(out, "wb").write(png)
+        if pk == "t":
+            tint_inside(out)
         made += 1
     for slug in BRANDS:
         out = os.path.join(LOGOS, slug + ".png")

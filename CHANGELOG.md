@@ -1,5 +1,18 @@
 # 변경 기록
 
+판 번호 규칙 (대.중간.작은): 대는 회사 양식 교체나 기존 빌더 전면 재작성, 중간은 기존 빌더 코드를 고쳐야만 통과하는 변경(함수 이름이나 인자 변경 및 삭제, 관문 실패 규칙 추가), 작은은 그 밖의 전부(결함 수정, 자산, 주의 검사, 새 도구, 문서, 모양 조정, 영향 없는 새 부품)
+
+## 1.7.0 (2026-11-16)
+- **기존 빌더 수정 필요 (중간 판 이유)**: 표와 그림 제목 필수. 표는 위 왼쪽 `[표 번호. 제목]`, 위 오른쪽 `(단위: ...)` (`Col.table`, `kpi_table`, `compare_table`, `collect_table` 의 `title=`, `unit=`, 단위 없는 맨 숫자 칸 둘 이상이면 단위 필수). 그림은 아래 가운데 `[그림 번호. 제목]` (`Col.chart`, `scatter`, `hist`, `image`, `gantt`, `mermaid` 의 `title=`, 구성도 장은 `d.page(..., figure=)`). 번호는 저장 때 덱 전체 연번. 빠지면 저장이 멈춤. `Col.chart(title=)` 는 위 파란 제목에서 아래 그림 제목으로 바뀜
+- 두 장 연속 같은 패널 폭과 같은 블록 순서면 주의 (출력만)
+- 구성도 문법: 세 계층 머리(원천, EdgePC, 서버)를 같은 네모 띠와 7.26pt 로 통일하고 색만 계층별로. 저장 때 주의(출력만): 연결선 색 셋 이상, 두 색 구성도 아이콘과 옛 색 아이콘 섞임. `legend(kind="line")` 점선 항목 `(색, 이름, "dash")`. 예제 구성도는 선 색 둘(남색 주 흐름, 회색)과 선 모양 범례
+- Tabler 아이콘 7개 안쪽 청록 채움, firewall 은 Phosphor wall 로
+- 그림 회귀 시험: `regress.py --baseline` 으로 기준 그림 저장, 이후 장마다 비교해 바뀐 장을 나란히 붙인 그림으로. 회귀 모드에서는 엄격 실패도 저장해 비교(엄격 실패로 표시)
+- 관문: 지난 통과 때와 엔진 판이 다르면 그림이 바뀐 장을 알림, 사람 견본 수치 비교 단계(주의만)
+- 사람 견본 라이브러리 `samples.py` (`assets/samples.json`, 배치 수치만), 사람 판별 시험 `blind.py`, 배포 뒤 새 폴더 설치 시험 `install_test.js`
+- 고침: 설치본에서 `doctor` 의 엔진 시험이 package.json 을 찾다 실패하던 것 (설치본에는 없음)
+- SKILL: 빌더를 쓰기 전 장 목록(절, 소제목, 요약 줄, 근거 자료) 확인, 구성도 문법 절
+
 ## 1.6.1 (2026-11-16)
 - 구성도 아이콘 123개 추가: 남색 선과 청록 바탕 두 색 세트(Phosphor duotone, Tabler, MIT). 서버, PC, 노트북, 모바일, 사용자, 관리자, 클라우드, DB, 라우터, 방화벽, API, 게이트웨이, Edge, PLC, 센서 등
 - 기술 로고 34개 추가(Simple Icons, CC0, 브랜드 색): docker, kubernetes, python, grafana, apachekafka, redis, nginx, mqtt, nodered, keycloak, pytorch, onnx, nvidia, siemens 등

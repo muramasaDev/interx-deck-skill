@@ -1,0 +1,160 @@
+{
+ "보고": [
+  {
+   "src": "design_help.pptx",
+   "slide": 1,
+   "shapes": 1,
+   "chars": 19,
+   "fills": 0,
+   "sizes": 0,
+   "pics": 0,
+   "lines": 0,
+   "cover": 0.043
+  }
+ ],
+ "구성도": [
+  {
+   "src": "design_help.pptx",
+   "slide": 2,
+   "shapes": 110,
+   "chars": 1438,
+   "fills": 2,
+   "sizes": 6,
+   "pics": 6,
+   "lines": 35,
+   "cover": 0.837
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 3,
+   "shapes": 72,
+   "chars": 1530,
+   "fills": 3,
+   "sizes": 5,
+   "pics": 4,
+   "lines": 13,
+   "cover": 0.793
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 4,
+   "shapes": 76,
+   "chars": 521,
+   "fills": 7,
+   "sizes": 8,
+   "pics": 5,
+   "lines": 15,
+   "cover": 0.646
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 5,
+   "shapes": 76,
+   "chars": 498,
+   "fills": 7,
+   "sizes": 8,
+   "pics": 5,
+   "lines": 16,
+   "cover": 0.646
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 6,
+   "shapes": 95,
+   "chars": 590,
+   "fills": 7,
+   "sizes": 8,
+   "pics": 5,
+   "lines": 17,
+   "cover": 0.685
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 7,
+   "shapes": 92,
+   "chars": 525,
+   "fills": 7,
+   "sizes": 8,
+   "pics": 5,
+   "lines": 19,
+   "cover": 0.648
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 8,
+   "shapes": 70,
+   "chars": 546,
+   "fills": 2,
+   "sizes": 3,
+   "pics": 5,
+   "lines": 18,
+   "cover": 0.436
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 9,
+   "shapes": 124,
+   "chars": 481,
+   "fills": 0,
+   "sizes": 4,
+   "pics": 0,
+   "lines": 42,
+   "cover": 0.459
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 10,
+   "shapes": 124,
+   "chars": 492,
+   "fills": 0,
+   "sizes": 4,
+   "pics": 0,
+   "lines": 42,
+   "cover": 0.455
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 11,
+   "shapes": 124,
+   "chars": 476,
+   "fills": 0,
+   "sizes": 4,
+   "pics": 0,
+   "lines": 42,
+   "cover": 0.462
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 12,
+   "shapes": 125,
+   "chars": 478,
+   "fills": 0,
+   "sizes": 4,
+   "pics": 0,
+   "lines": 43,
+   "cover": 0.459
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 13,
+   "shapes": 143,
+   "chars": 395,
+   "fills": 1,
+   "sizes": 8,
+   "pics": 69,
+   "lines": 6,
+   "cover": 0.62
+  },
+  {
+   "src": "design_help.pptx",
+   "slide": 14,
+   "shapes": 87,
+   "chars": 715,
+   "fills": 2,
+   "sizes": 7,
+   "pics": 9,
+   "lines": 16,
+   "cover": 0.464
+  }
+ ]
+}

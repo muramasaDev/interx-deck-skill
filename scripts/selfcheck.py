@@ -18,7 +18,7 @@ d.section("부품 자체 점검")
 s = d.report_slide("부품 자체 점검", "보고형 3열", lead="세 패널을 화살표로 이은 보고형 장")
 c1, c2, c3 = report_panels(s, ["원천", "규칙", "결과"])
 c1.table([["Tag명", "Description"], ["CU1_F_DEN", "전면 전류 밀도"], ["CU1_B_DEN", "후면 전류 밀도"]],
-         ratio=[1.2, 2.15], highlight=(0,)).arrow().notes(["같은 Tag명 다른 Description"])
+         ratio=[1.2, 2.15], highlight=(0,), title="원천 Tag 설명").arrow().notes(["같은 Tag명 다른 Description"])
 c2.rule_list("ISH 데이터 생성 규칙", [("doc_id_green", "규칙 하나"), ("checklist_green", "규칙 둘")]).notes(["규칙 결론"])
 c3.chip_tree([(0, "SM", "OperationData"), (1, "SMC", "Recipe"), (2, "Prop", "Front_Side"), (2, "Prop", "Back_Side"),
               (1, "SML", "Rectifier"), (2, "Ent", "Machine1"), (2, "Rel", "HasPart")], value_w=1.6)
@@ -31,6 +31,7 @@ except ValueError:
     pass
 
 s = d.doc_slide("1-1. 부품 자체 점검 (설계문서형)", "구성도")
+_reg(s)["figure"] = "부품 구성도"
 src = frame(s, 0.75, 2.21, 1.1, 3.3, "Data Source", kind="source")
 icon(s, "plc", 1.05, 2.8, w=0.4, name="PLC")
 edge = frame(s, 2.1, 2.21, 4.12, 3.6, "Edge.PC(Machine.AX)", kind="edge", sub="On-Premise")
@@ -57,6 +58,7 @@ d.clone(s, 4, text="Data Lake", dy=-0.1)
 
 # 설계문서형 자동 배치
 s = d.doc_slide("1-2. 자동 배치 점검", "구성도")
+_reg(s)["figure"] = "자동 배치 구성도"
 g = DocGrid(s, right="source", rows=3)
 src = g.source("source", [("plc", "PLC"), ("camera", "Camera")])
 e = g.group("edge", "Edge.PC", kind="edge", sub="On-Premise", header="DA Server", cols=2, rows=(0, 1))
@@ -107,6 +109,7 @@ except ValueError:
 
 # link 자동
 s = d.doc_slide("1-4. link 자동 연결", "구성도")
+_reg(s)["figure"] = "link 연결 구성도"
 g = DocGrid(s, right="source", rows=3)
 src = g.source("source", [("plc", "PLC"), ("camera", "Camera")])
 e = g.group("edge", "Edge.PC", kind="edge", header="DA Server", cols=2)
@@ -128,6 +131,7 @@ bad_slide = s
 
 # 2차 검토 재현 사례
 s = d.doc_slide("1-6. 반올림, 대체 경로, 조건 문구", "구성도")
+_reg(s)["figure"] = "경로 및 조건 구성도"
 A = db(s, round(2.5 - 0.8 / 2, 3), 2.5, 0.8, 0.24, "A")
 B = db(s, round(2.5 - 0.9 / 2, 3), 4.5, 0.9, 0.24, "B")
 c = link(s, A, B)                                       # EMU 반올림 오차에도 곧은 선
@@ -142,9 +146,11 @@ extra_slide = s
 # 점선 다발
 s = d.report_slide("점선 다발 점검", "표 행과 칩", lead="표 행마다 링크 아이콘을 거쳐 칩으로")
 k1, k2, k3 = cols = report_panels(s, ["표", "칩", "기타"], hub_gap=1)
+_reg(s)["figure"] = "점선 다발"
 assert abs((cols.gaps[1][1] - cols.gaps[1][0]) - 1.38) < 0.02 and abs((cols.gaps[0][1] - cols.gaps[0][0]) - 0.67) < 0.01
 k1.notes(["왼쪽"])
-k2.table([["용어", "SemanticId"], ["Rectifier", "/ids/1"], ["Frontside", "/ids/2"], ["Backside", "/ids/3"]])
+k2.table([["용어", "SemanticId"], ["Rectifier", "/ids/1"], ["Frontside", "/ids/2"], ["Backside", "/ids/3"]],
+         title="용어 및 SemanticId")
 k3.chip_tree([(0, "SM", "표준화된 데이터 구조"), (1, "SML", "Rectifier"), (2, "SMC", "Frontside"), (3, "Prop", "MeasurementCurrent"),
               (2, "SMC", "Backside")])
 for c in cols:
@@ -163,8 +169,8 @@ bundle_slide = s
 s = d.report_slide("범용 장 점검", "차트, 수치, 목록", lead="범용 장 부품")
 a, b, c = cols = report_panels(s, ["수치", "차트", "목록"])
 a.kpis([("15", "/ 22", "이름", "설명")]).kpis([("1", "건", "이름")])
-b.chart("col", ["가", "나"], {"값": [1, 2]}, h=1.5, highlight=(1,), number_format='0"개"') \
- .chart("line", ["1월", "2월", "3월"], {"A": [1, 3, 2], "B": [2, 1, 3]}, h=1.5)
+b.chart("col", ["가", "나"], {"값": [1, 2]}, h=1.5, highlight=(1,), number_format='0"개"', title="막대 점검") \
+ .chart("line", ["1월", "2월", "3월"], {"A": [1, 3, 2], "B": [2, 1, 3]}, h=1.5, title="선 점검")
 c.section("제목", ["줄 하나", "줄 둘"], highlight=(1,)).steps([(1, "제목", "설명"), (2, "제목", ["줄 1", "줄 2"])])
 for col in cols:
     col.done()
@@ -172,11 +178,12 @@ cx_ = [e for e in s.shapes._spTree.iter(qn("p:graphicFrame"))]
 assert len(cx_) == 2, len(cx_)
 s = d.report_slide("일정 및 그림 점검", "gantt, image", lead="일정")
 a, b = cols = report_panels(s, ["일정", "그림"], arrows=False)
-a.gantt(["1", "2", "3"], [("가", 0, 1, "done"), ("나", 1, 2.5, "now", "진행"), ("다", 2.9, 0, "mile", "끝")], today=1.5)
-b.image(os.path.join(ICONS, "_catalog.png"), h=2.0, marks=[(0.5, 0.5, 1)])
+a.gantt(["1", "2", "3"], [("가", 0, 1, "done"), ("나", 1, 2.5, "now", "진행"), ("다", 2.9, 0, "mile", "끝")], today=1.5, title="일정 점검")
+b.image(os.path.join(ICONS, "_catalog.png"), h=2.0, marks=[(0.5, 0.5, 1)], title="아이콘 목록 화면")
 for col in cols:
     col.done()
 s = d.doc_slide("1-7. 복잡한 구성도 점검", "구성도")
+_reg(s)["figure"] = "복잡한 구성도"
 g = DocGrid(s, right=None, rows=6, bottom=6.3)
 g.source("source", [("plc", "PLC"), ("camera", "Camera"), ("folder", "CSV")])
 e = g.group("edge", "Edge", kind="edge", header="DA", cols=2, area=False)
@@ -236,9 +243,11 @@ _x = etree.tostring(_math(r"J_{보정} = J_{0} \times \frac{T + E}{\hat{d}}", 12
 assert all(t in _x for t in ("<m:f>", "<m:sSub>", "<m:acc>", "\U0001D43D", ">보정<", ">×<")), _x
 assert _linear(r"J_{0} \times \frac{T}{E}") == "J_0 × (T) / (E)", _linear(r"J_{0} \times \frac{T}{E}")
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 판 번호 셋이 같아야 함
-_v = [json.load(open(os.path.join(_root, f), encoding="utf8")) for f in ("package.json", ".claude-plugin/plugin.json",
-                                                                       ".claude-plugin/marketplace.json")]
-assert _v[0]["version"] == _v[1]["version"] == _v[2]["plugins"][0]["version"], "판 번호가 서로 다름"
+_vs = {f: json.load(open(os.path.join(_root, f), encoding="utf8")) for f in
+       ("package.json", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json")
+       if os.path.exists(os.path.join(_root, f))}   # 설치본에는 package.json 이 없음
+_vs = {f: (v["plugins"][0]["version"] if "plugins" in v else v["version"]) for f, v in _vs.items()}
+assert len(set(_vs.values())) == 1, f"판 번호가 서로 다름: {_vs}"
 # 배치 1: 검사와 발표자 노트, 도장, 숫자 단위 붙임
 import subprocess  # noqa: E402
 import tempfile  # noqa: E402
@@ -249,6 +258,20 @@ import update_imnotai  # noqa: E402
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _tmp = tempfile.mkdtemp(prefix="ixself_")
+
+
+def _chart(s, x, y, w, h, *a, **kw):
+    """chart + 아래 가운데 그림 제목"""
+    g = chart(s, x, y, w, h, *a, **kw)
+    figure_caption(s, "점검 차트", x, y + h + 0.02, w)
+    return g
+
+
+def _gantt(s, x, y, w, periods, tasks, **kw):
+    """gantt + 아래 가운데 그림 제목"""
+    g = gantt(s, x, y, w, periods, tasks, **kw)
+    figure_caption(s, "점검 일정", x, y + 0.27 + 0.3 * len(tasks) + 0.02, w)
+    return g
 
 
 def _mini(name, build, **kw):
@@ -309,7 +332,7 @@ for _t in ("Mastodon 서버", "xx 와 xxxl", "예시 장"):
 
 # check.py: 출처 줄, 첫 본문 장 요약, 발표 시간
 def _p2(m):
-    chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+    _chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
 
 
 _rc, _o = _py("check.py", _mini("b", _p2))
@@ -318,7 +341,7 @@ assert "출처 줄이 없음" in _o, _o
 
 def _p3(m):
     s = m.page("차트", lead="요약")
-    chart(s, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+    _chart(s, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
     notes(s, 1, 5.5, 6, ["출처: 시험 결과서 (2026.05)"])
 
 
@@ -430,14 +453,14 @@ for _k, _fn in (("num_cards 제목", lambda c, n: c.num_cards([("가" * n, "설�
 # 차트 단위: y_title 이나 number_format 의 단위 글자가 있어야 저장됨
 for _kw, _ok in (({}, False), ({"y_title": "건수 (건)"}, True), ({"number_format": '0"건"'}, True),
                  ({"number_format": "0.0%"}, True)):
-    _e = _strict(lambda m, kw=_kw: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, **kw))
+    _e = _strict(lambda m, kw=_kw: _chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, **kw))
     assert ("y_title" in _e) == (not _ok), (_kw, _e)
 _buf = io.StringIO()
 with contextlib.redirect_stdout(_buf):
-    _mini("h", lambda m: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"],
+    _mini("h", lambda m: _chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"],
                                {k_: [1, 2] for k_ in "abcde"}, number_format='0"건"'))
 assert "계열 5개" in _buf.getvalue(), _buf.getvalue()
-_ch = _mini("i", lambda m: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "bar", ["가", "나"], {"값": [1, 2]},
+_ch = _mini("i", lambda m: _chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "bar", ["가", "나"], {"값": [1, 2]},
                                 y_title="처리 건수 (건)"))
 assert "처리 건수 (건)" in "".join(texts for sh_ in Presentation(_ch).slides[2].shapes if sh_.has_chart
                               for texts in [sh_.chart.value_axis.axis_title.text_frame.text]), "y_title 이 축에 없음"
@@ -453,7 +476,7 @@ for _bad in (lambda: Col(_s0, 1, 11).kpi_table([]), lambda: Col(_s0, 1, 11).kpi_
         raise AssertionError("막혀야 할 표 입력이 통과함")
     except ValueError:
         pass
-_c0 = Col(_s0, 1, 11).collect_table([("도금", "전류", "자동"), ("검사", "두께", "반자동"), ("출하", "Lot", "수동")])
+_c0 = Col(_s0, 1, 11).collect_table([("도금", "전류", "자동"), ("검사", "두께", "반자동"), ("출하", "Lot", "수동")], title="수집 항목")
 _c0.done()
 assert [c.text for c in _c0[0].table.rows[0].cells] == ["공정", "데이터", "집계 방법"]
 
@@ -461,7 +484,7 @@ assert [c.text for c in _c0[0].table.rows[0].cells] == ["공정", "데이터", "
 def _kt(src):
     def b(m):
         s = m.page("KPI", lead="요약")
-        Col(s, 1, 11, top=2, bottom=2.7).kpi_table(_kr).done()
+        Col(s, 1, 11, top=2, bottom=2.8).kpi_table(_kr, title="수집 KPI").done()
         if src:
             notes(s, 1, 3, 10, [src if isinstance(src, str) else "출처: 4차 시험 결과서 (2026.05)"])
     return b
@@ -503,7 +526,7 @@ for _bad in (lambda: _m0.criteria([]), lambda: _m0.criteria(["가", "가"]),
 # 일정 및 산출물
 def _dl(names, deliv):
     def b(m):
-        gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [(n, 0, 1, "done") for n in names])
+        _gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [(n, 0, 1, "done") for n in names])
         m.deliverables(deliv)
     return b
 
@@ -558,8 +581,8 @@ _SEQ = chr(10).join(["sequenceDiagram", " participant A as 설비", " participan
 
 def _mm(m):
     global _mm_shapes
-    _mm_shapes = mermaid(m.page("흐름", lead="요약"), _FLOW, 1.0, 2.0, 11.3, 4.8)
-    mermaid(m.page("순서", lead="요약"), _SEQ, 1.0, 2.0, 11.3, 4.8)
+    _mm_shapes = mermaid(m.page("흐름", lead="요약"), _FLOW, 1.0, 2.0, 11.3, 4.8, title="읽기 흐름")
+    mermaid(m.page("순서", lead="요약"), _SEQ, 1.0, 2.0, 11.3, 4.8, title="값 전송 순서")
 
 
 assert _strict(_mm) == ""
@@ -631,7 +654,7 @@ for _t, _ok in (("※ 출처: 시험 결과서", True), ("출처：시험 결과
 def _chart_note(line):
     def b(m):
         s_ = m.page("차트", lead="요약")
-        chart(s_, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+        _chart(s_, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
         notes(s_, 1, 5.5, 6, [line])
     return b
 
@@ -643,14 +666,14 @@ assert "출처 줄이 없음" not in _o, _o
 
 # 차트 단위: 통화 기호도 단위
 for _nf in ("$#,##0", "₩#,##0", "€0.0", "¥0"):
-    assert _strict(lambda m, nf=_nf: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]},
+    assert _strict(lambda m, nf=_nf: _chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]},
                                          number_format=nf)) == "", _nf
 
 
 # 일정 및 산출물: 마일스톤 행은 대조에서 제외
 def _ms(kind):
     def b(m):
-        gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [("설계", 0, 1, "done"), ("현장 검수", 1.5, 1, kind, "검수")])
+        _gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [("설계", 0, 1, "done"), ("현장 검수", 1.5, 1, kind, "검수")])
         m.deliverables({"설계": ["설계서"]})
     return b
 
@@ -684,7 +707,7 @@ assert any(sh_.has_text_frame and sh_.text_frame.text.startswith("제목 하나"
 
 # 비교 표: 한 표, 바뀐 행의 개선 칸만 남색
 _cc = Col(_m0.page("비교", lead="요약"), 1, 8, top=2, bottom=4)
-_cc.compare_table([("기록 방식", "수기 입력", "자동 수집"), ("기록 간격", "1일", "1초"), ("위치", "PC", "서버")], highlight=(1,))
+_cc.compare_table([("기록 방식", "수기 입력", "자동 수집"), ("기록 간격", "1일", "1초"), ("위치", "PC", "서버")], highlight=(1,), title="현행 및 개선")
 _cc.done()
 _ct2 = _cc[0].table
 assert [c.text for c in _ct2.rows[0].cells] == ["항목", "현행", "개선"] and len(_ct2.rows) == 4
@@ -778,7 +801,7 @@ assert gate._version() == "1.0.0"
 json.dump({"version": "9.9.9"}, open(os.path.join(_vt, ".claude-plugin", "plugin.json"), "w"))
 assert gate._version() == "9.9.9"
 gate.HERE = _gh
-assert gate._version() == _v[1]["version"]
+assert gate._version() == _vs[".claude-plugin/plugin.json"]
 
 # 장 순서는 sldIdLst 순서 (파일 번호 순서 아님)
 _PNS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
@@ -885,7 +908,7 @@ _CH = ["graph TD|A[가] --> B[나]|B --> C[다]|A --> C", "graph TD|A[가] --> B
        "graph LR|A[가] --> B[나]|B --> C[다]|A --> C", "graph LR|A[가] --> B[나]|B --> C[다]|C --> A",
        "graph LR|A[가] --> B[나]|B --> C[다]|C --> D[라]|D -- 실패 --> B|A --> C"]
 for _src in _CH:
-    _e = _strict(lambda m, sr=_src: mermaid(m.page("우회", lead="요약"), sr.replace("|", chr(10)), 1.0, 2.0, 11.3, 4.8))
+    _e = _strict(lambda m, sr=_src: mermaid(m.page("우회", lead="요약"), sr.replace("|", chr(10)), 1.0, 2.0, 11.3, 4.8, title="우회 흐름"))
     assert _e == "", (_src, _e)
     _rc, _o = _py("check.py", _mp)
     assert "장 밖으로" not in _o and "연결선" not in _o, (_src, _o)
@@ -901,12 +924,75 @@ try:
 except ValueError as _ex:
     assert "E -> B" in str(_ex) and "피해" in str(_ex), _ex
 # 노드 글: 따옴표는 빼고 <br> 과 <br/> 는 줄 바꿈
-_sh = mermaid(_m0.page("글", lead="요약"), "graph TD" + chr(10) + 'A["수집<br/>시작"] --> B[읽기<br>실패 시 "재시도"]', 1.0, 2.0, 11.3, 4.8)
+_sh = mermaid(_m0.page("글", lead="요약"), "graph TD" + chr(10) + 'A["수집<br/>시작"] --> B[읽기<br>실패 시 "재시도"]', 1.0, 2.0, 11.3, 4.8, title="글 처리")
 assert _sh["A"].text_frame.text == "수집" + chr(10) + "시작" and _sh["B"].text_frame.text == "읽기" + chr(10) + "실패 시 재시도"
 assert _sh["A"].height == _sh["B"].height and _sh["A"].height / 914400 >= 0.34
 _sq = mermaid(_m0.page("순서", lead="요약"), chr(10).join(["sequenceDiagram", 'participant A as "설비<br/>PLC"',
                                                           "participant B as 수집기", "A->>B: 값 요청<br/>1초마다"]),
-              1.0, 2.0, 11.3, 4.8)
+              1.0, 2.0, 11.3, 4.8, title="참가자 글")
 assert _sq["A"].text_frame.text == "설비" + chr(10) + "PLC"
+
+# 구성도 문법 주의: 선 색 셋(빨강 제외), 아이콘 세트 섞임
+_dn = Deck(author="AX Development / 시험 연구원", purpose="문서")
+_dn.cover("구성도 문법", "2026.11.16")
+_dn.section("구성")
+_ds = _dn.page("선과 아이콘", lead="요약")
+_b = [box(_ds, 1 + 2.5 * i, 3.0, 1.0, 0.3, f"상자{i}") for i in range(4)]
+for _i, _c in enumerate((NAVY, GRAY, TEAL)):
+    connect(_ds, _b[_i], "right", _b[_i + 1], "left", color=_c)
+assert any("연결선 색 3종" in m for m in diagram_notes(_ds)), diagram_notes(_ds)
+icon(_ds, "server_rack", 1.0, 5.0, w=0.4)
+icon(_ds, "plc", 2.0, 5.0, w=0.4)
+assert any("섞임" in m and "plc" in m for m in diagram_notes(_ds)), diagram_notes(_ds)
+# 단위 필수 판정: 날짜, 버전, 연도, 첫 열 순번은 숫자로 세지 않음
+_ws = len(_reg(_ds).get("warn", []))
+table_caption(_ds, 1.0, 1.8, 6.0, "일정", rows=[["순번", "날짜", "판"], ["1", "2026.05.01", "1.2.0"], ["2", "2026", "1.3.0"]])
+assert len(_reg(_ds).get("warn", [])) == _ws, _reg(_ds)["warn"][_ws:]
+table_caption(_ds, 1.0, 1.8, 6.0, "수량", rows=[["항목", "값"], ["가", "12"], ["나", "3.5"]])
+assert "단위 없음" in _reg(_ds)["warn"][-1], _reg(_ds)["warn"][-1]
+# 견본 지표: 그룹 안 도형과 연결선까지 셈
+import samples as _smp  # noqa: E402
+_grp = _ds.shapes.add_group_shape([_b[0], _b[1]])
+assert _smp.kind(_ds) == "구성도" and _smp.metrics(_ds, Inches(13.333))["shapes"] >= 7
+
+# 표 및 그림 제목: 덱 전체 연번 (장 순서, 장 안은 왼쪽 칸부터), 제목과 단위 누락, 한 줄
+_NUMS = [["가", "건수"], ["나", "12"], ["다", "34"]]
+_LONG = "공정별 처리 건수와 불량 건수를 한 줄로 이어 보는 긴 제목 점검 문구 입니다"
+
+
+def _cap(m):
+    for k_, (kind, a_t, b_t) in enumerate((("table", "왼쪽 표", "오른쪽 표"), ("chart", "왼쪽 그림", "오른쪽 그림"))):
+        a_, b_ = cc_ = report_panels(m.page(f"제목 {k_}", lead="요약"), ["왼쪽", "오른쪽"], arrows=False)
+        for c_, t_ in ((b_, b_t), (a_, a_t)):   # 오른쪽 칸을 먼저 만들어도 왼쪽 칸이 앞 번호
+            if kind == "table":
+                c_.table(_NUMS, title=_LONG if t_ == a_t else t_, unit="건")
+            else:
+                c_.chart("col", ["가", "나"], {"값": [1, 2]}, title=t_, number_format='0"건"')
+        for c_ in (b_, a_):
+            c_.done()
+
+
+assert _strict(_cap) == "", _strict(_cap)
+_cs = Presentation(os.path.join(_tmp, "점검_strict_v0.1.0_261116.pptx")).slides
+_cn = [[sh_ for sh_ in sl_.shapes if sh_.name.startswith("IXCAP_")] for sl_ in list(_cs)[2:4]]
+_ct = [[sh_.text_frame.text for sh_ in c_] for c_ in _cn]
+assert sorted(_ct[0]) == sorted([f"[표 1. {_LONG}]", "[표 2. 오른쪽 표]"]), _ct   # (a) 장 순서와 왼쪽 칸 먼저
+assert sorted(_ct[1]) == ["[그림 1. 왼쪽 그림]", "[그림 2. 오른쪽 그림]"], _ct
+assert all(sh_.text_frame.text.startswith("[") for c_ in _cn for sh_ in c_)
+assert all(len(sh_.text_frame.paragraphs) == 1 and sh_._element.find(".//" + qn("a:br")) is None
+           for c_ in _cn for sh_ in c_), "제목이 한 문단 한 줄이 아님"   # (d)
+assert any(sh_.text_frame.text == "(단위: 건)" for sh_ in _cs[2].shapes), "단위 글이 없음"
+
+
+def _tb(**kw):
+    return lambda m: Col(m.page("표", lead="요약"), 1, 6).table(_NUMS, **kw).done()
+
+
+_e = _strict(_tb(unit="건"))   # (b) 표 제목 없음
+assert "표 제목 없음" in _e, _e
+assert "단위 없음" not in _e, _e
+_e = _strict(_tb(title="숫자 표"))   # (c) 단위 없음
+assert "단위 없음" in _e and "표 제목 없음" not in _e, _e
+assert _strict(_tb(title="숫자 표", unit="건")) == ""
 
 print("OK", out, "cxn", x.count("<p:cxnSp>"))

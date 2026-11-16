@@ -37,9 +37,9 @@ description: INTERX 회사 양식 보고 PPT (보고 자료, 결과 보고, 과�
 s = d.page("핵심 수치 (예시 값)", lead="요약 한 줄")
 top = banner(s, "핵심 문장 한 줄", tags=["1단계", "2단계", "3단계"], current=1)   # 없어도 됨
 a, b, c = cols = report_panels(s, ["원천", "규칙", "결과"], top=top, footnote="* LLM: Large Language Model")
-a.table(rows, ratio=[1.2, 2]).notes(["결론"])
+a.table(rows, ratio=[1.2, 2], title="표 제목", unit="건").notes(["결론"])   # 위 왼쪽 [표 1. 제목], 오른쪽 (단위: 건)
 b.rule_list("규칙", [("doc_check", "이름", "설명"), ...])
-c.chart("col", 항목, {"건수": 값}, highlight=(1,))
+c.chart("col", 항목, {"건수": 값}, highlight=(1,), title="그림 제목")      # 아래 가운데 [그림 1. 제목]
 for col in cols: col.done()       # 모든 패널에 블록을 넣은 뒤 (장 전체 상자 높이 맞춤)
 ```
 | 블록 (Col) | 모양 | 출처 |

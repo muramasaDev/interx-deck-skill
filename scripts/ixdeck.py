@@ -7,6 +7,7 @@ import itertools
 import math
 import os
 import re
+import sys
 
 from lxml import etree
 from pptx import Presentation
@@ -405,6 +406,47 @@ def big_arrow(s, x, y, w=0.38, h=0.33, direction="right"):
     return sh
 
 
+CAP_H = 0.22   # 표 제목 및 그림 제목 줄 높이
+_NUM_CELL = re.compile(r"^[+\-]?\d[\d,]*(\.\d+)?$")   # 단위 없는 맨 숫자 칸 (날짜, 버전은 점이 둘이라 제외)
+_YEAR = re.compile(r"^(19|20)\d\d$")
+
+
+def _caption(s, kind, title, x, y, w, align, key=None):
+    """[표 #. 제목] 또는 [그림 #. 제목]. 번호는 저장 때 key 순서로 (덱 전체 연번)"""
+    if not title or not str(title).strip():
+        _warn(s, f"{kind} 제목 없음: title='{kind} 제목' ({kind} {'왼쪽 위' if kind == '표' else '아래 가운데'}에 [{kind} 번호. 제목])")
+        title = "제목 없음"
+    t_ = f"[{kind} #. {title}]"
+    need = _text_w(t_, 8) + 0.1
+    if need > w:
+        if align == "c":   # 그림 제목: 가운데를 지키며 넓힘
+            x, w = x + w / 2 - need / 2, need
+        else:
+            _warn(s, f"{kind} 제목 '{title}' 이 칸({w:.2f} in)보다 김: 제목을 줄이거나 칸을 넓힘")
+    t = text(s, x, y, w, 0.2, t_, size=8, bold=True, color=SLATE9, align=align)
+    t.name = f"IXCAP_{kind}"
+    _reg(s).setdefault("cap_keys", {})[t.shape_id] = key or (round(y, 1), x, y)
+    return _obst(s, t)
+
+
+def table_caption(s, x, y, w, title, unit=None, rows=None, key=None):
+    """표 위 한 줄: 왼쪽 [표 #. 제목], 오른쪽 (단위: ...). y 는 이 줄의 위쪽"""
+    uw = (_text_w(f"(단위: {unit})", 6.35) + 0.1) if unit else 0
+    _caption(s, "표", title, x, y, w - uw, "l", key=key)
+    if unit:
+        u = text(s, x + w - uw, y, uw, 0.2, f"(단위: {unit})", size=6.35, color=SLATE9, align="r")
+        u.name = "IXUNIT"
+        _obst(s, u)
+    elif rows and sum(bool(_NUM_CELL.match(str(c).strip())) and not _YEAR.match(str(c).strip())
+                      for r in rows[1:] for c in r[1:]) >= 2:   # 첫 열(항목, 순번) 제외
+        _warn(s, f"숫자 표 '{title}' 에 단위 없음: unit='건, %' (표 오른쪽 위에 (단위: ...))")
+
+
+def figure_caption(s, title, x, y, w, key=None):
+    """그림 아래 가운데 [그림 #. 제목]. y 는 이 줄의 위쪽"""
+    return _caption(s, "그림", title, x, y, w, "c", key=key)
+
+
 def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, header_color=WHITE,
           highlight=(), align=None, cell_hl=()):
     """rows[0] 머리행. highlight: 남색 행, cell_hl: 남색 칸"""
@@ -463,11 +505,10 @@ def frame(s, x, y, w, h, title, kind="platform", sub=None):
     elif kind == "edge":
         body = box(s, x, y + 0.27, w, h - 0.27, fill=WHITE, line="E2E8F0", lw=1, geom="round", radius=0, shadow=True)
         lines = [(title, BLACK)] + ([(sub, ACCENT)] if sub else [])
-        box(s, x, y, w, 0.24, lines, fill=SLATE3, size=6.35, bold=True, inset=(0.02, 0, 0.02, 0))
+        box(s, x, y, w, 0.24, lines, fill=SLATE3, size=7.26 if not sub else 6.35, bold=True, inset=(0.02, 0, 0.02, 0))
     else:
-        body = box(s, x, y + 0.29, w, h - 0.29, fill=WHITE, line=BLACK, lw=0.5, shadow=True)
-        box(s, x, y, w, 0.25, title, fill=GRAY, line=BLACK, geom="round", radius=0.06, size=8.16, bold=True,
-            color=WHITE, shadow=True)
+        body = box(s, x, y + 0.27, w, h - 0.27, fill=WHITE, line=BLACK, lw=0.5, shadow=True)
+        box(s, x, y, w, 0.24, title, fill=SLATE6, size=7.26, bold=True, color=WHITE, inset=(0.02, 0, 0.02, 0))
     return body
 
 
@@ -511,15 +552,20 @@ def more(s, x, y, color=GRAY):
 
 
 def legend(s, x, y, items, pitch=0.17, kind="oval"):
-    """종류 범례. items=[(색, 이름)]"""
-    for i, (c, t) in enumerate(items):
+    """종류 범례. items=[(색, 이름)] 또는 kind="line" 에서 [(색, 이름, 점선 종류)]"""
+    for i, it in enumerate(items):
+        c, t, dash = (tuple(it) + (None,))[:3]
         yy = y + i * pitch
         if kind == "oval":
             box(s, x, yy + 0.02, 0.1, 0.1, fill=None, line=c, lw=1.25, geom="oval")
+        elif dash:
+            ln = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(x), Inches(yy + 0.078), Inches(0.16), 0)   # 높이 0 테두리 = 선
+            ln.fill.background()
+            _line(ln, c, 1.25, dash)
         else:
             box(s, x, yy + 0.065, 0.16, 0.025, fill=c)
         text(s, x + 0.2, yy, _text_w(t, 6.35) + 0.1, 0.2, t, size=6.35, color=SLATE9, align="l")
-    w = 0.2 + max(_text_w(t, 6.35) + 0.1 for _, t in items)
+    w = 0.2 + max(_text_w(it[1], 6.35) + 0.1 for it in items)
     _reg(s)["obst"].append(((x, y, x + w, y + pitch * (len(items) - 1) + 0.2), 0))
 
 
@@ -555,6 +601,12 @@ def label(s, x, y, w, t, size=6.35, color=SLATE9, bold=False, align="c"):
     return _obst(s, text(s, x, y, w, 0.2, t, size=size, bold=bold, color=color, align=align))
 
 
+def _duo_keys():
+    """두 색 구성도 아이콘 세트 이름 (build_icons.SET)"""
+    from build_icons import SET
+    return set(SET)
+
+
 _BAD_ICONS = {"binary": "숫자가 빽빽한 그림이라 0.3 in 로 줄이면 뭉개짐. spreadsheet, doc_id_green, chart_distribution 등"}
 
 
@@ -572,6 +624,7 @@ def _icon_path(key):
 def icon(s, key, x, y, w=None, h=None, name=None, lw=0.8):
     """아이콘 그림. name 을 주면 아래에 이름"""
     path = _icon_path(key)
+    _reg(s).setdefault("icon_keys", set()).add(key)
     pic = s.shapes.add_picture(path, Inches(x), Inches(y), Inches(w) if w else None, Inches(h) if h else None)
     if name:
         cx = x + pic.width / 914400 / 2
@@ -1550,8 +1603,13 @@ class Col:
         self.items = []  # (높이, 그리기, 행 수, 행 추가 한도)
         _reg(s).setdefault("cols", []).append(self)
 
+    def _ck(self, y):
+        """제목 번호 순서: 칸 묶음 위 → 칸 왼쪽 → 블록 위"""
+        return (round(self.top, 1), round(self.x, 1), y)
+
     def _add(self, h, draw, rows=0, room=0.0):
         self.items.append((h, draw, rows, room))
+        self.kinds = getattr(self, "kinds", []) + [sys._getframe(1).f_code.co_name]   # 같은 틀 되풀이 확인용
         return self
 
     def __getitem__(self, i):
@@ -1578,13 +1636,17 @@ class Col:
                          lambda y, r: chip_tree(self.s, self.x, y, rows, pitch=pitch + r, **kw),
                          rows=len(rows) - 1, room=0.05)
 
-    def table(self, rows, ratio=None, row_h=0.26, **kw):
+    def table(self, rows, ratio=None, row_h=0.26, title=None, unit=None, **kw):
+        """표 블록. title: 왼쪽 위 [표 #. 제목], unit: 오른쪽 위 (단위: ...)"""
         if not rows or not rows[0]:
             raise ValueError("표 행이 없음")
         ratio = ratio or [1] * len(rows[0])
         cw = [self.w * k / sum(ratio) for k in ratio]
-        return self._add(min(row_h, 0.27) + row_h * (len(rows) - 1),
-                         lambda y, r: table(self.s, self.x, y, cw, rows, row_h=row_h + r, **kw),
+
+        def draw(y, r):
+            table_caption(self.s, self.x, y, self.w, title, unit, rows, key=self._ck(y))
+            return table(self.s, self.x, y + CAP_H, cw, rows, row_h=row_h + r, **kw)
+        return self._add(CAP_H + min(row_h, 0.27) + row_h * (len(rows) - 1), draw,
                          rows=len(rows) - 1, room=max(self.MAX_ROW - row_h, 0))
 
     def _fixed_table(self, head, rows, ratio, row_h, **kw):
@@ -1596,39 +1658,42 @@ class Col:
                 raise ValueError(f"표 행은 {head} 칸을 모두 채움: {r}")
         return self.table([head, *[list(r) for r in rows]], ratio=ratio, row_h=row_h, **kw)
 
-    def kpi_table(self, rows, row_h=0.3, last=KPI_HEAD[-1]):
+    def kpi_table(self, rows, row_h=0.3, last=KPI_HEAD[-1], title=None, unit=None):
         """KPI 표. rows=[(지표, 기존, 목표, 계산식, 근거)]. last: 마지막 열 이름"""
         _reg(self.s)["kpi_table"] = True
-        return self._fixed_table([*KPI_HEAD[:-1], last], rows, [1.25, 1, 1.3, 2.25, 2.2], row_h)
+        return self._fixed_table([*KPI_HEAD[:-1], last], rows, [1.25, 1, 1.3, 2.25, 2.2], row_h, title=title,
+                                 unit=unit)
 
-    def compare_table(self, rows, left="현행", right="개선", highlight=(), row_h=0.3):
+    def compare_table(self, rows, left="현행", right="개선", highlight=(), row_h=0.3, title=None, unit=None):
         """현행 및 개선 한 표. highlight: 바뀐 행 (0부터)"""
         n = len(rows)
         if any(not isinstance(i, int) or not 0 <= i < n for i in highlight):
             raise ValueError(f"compare_table highlight {tuple(highlight)} 는 행 번호 0 ~ {n - 1}")
-        return self._fixed_table(["항목", left, right], rows, [1, 1.6, 1.6], row_h, cell_hl=[(i, 2) for i in highlight])
+        return self._fixed_table(["항목", left, right], rows, [1, 1.6, 1.6], row_h, cell_hl=[(i, 2) for i in highlight],
+                                 title=title, unit=unit)
 
-    def collect_table(self, rows, row_h=0.3, first="공정"):
+    def collect_table(self, rows, row_h=0.3, first="공정", title=None, unit=None):
         """수집 항목 표. first: 첫 열 이름 (기본 '공정')"""
         for r in rows:
             if len(r) == 3 and r[2] not in COLLECT_METHODS:
                 raise ValueError(f"집계 방법 '{r[2]}' 은 {COLLECT_METHODS} 중 하나")
-        return self._fixed_table([first, *COLLECT_HEAD[1:]], rows, [1, 2.4, 1], row_h)
+        return self._fixed_table([first, *COLLECT_HEAD[1:]], rows, [1, 2.4, 1], row_h, title=title, unit=unit)
 
     def chart(self, kind, categories, series, h=1.9, title=None, **kw):
-        """차트 블록. title 은 파란 9pt 제목"""
-        th = 0.26 if title else 0
-
+        """차트 블록. title: 아래 가운데 [그림 #. 제목]"""
         def draw(y, r):
-            if title:
-                text(self.s, self.x, y, self.w, 0.22, title, size=9, bold=True, color=BLUE, align="c")
-            return chart(self.s, self.x, y + th, self.w, h + r, kind, categories, series, **kw)
-        return self._add(h + th, draw, rows=1, room=1.2)
+            g = chart(self.s, self.x, y, self.w, h + r, kind, categories, series, **kw)
+            figure_caption(self.s, title, self.x, y + h + r + 0.02, self.w, key=self._ck(y))
+            return g
+        return self._add(h + CAP_H, draw, rows=1, room=1.2)
 
-    def scatter(self, series, x_title, y_title, h=2.2, **kw):
-        """산점도 블록. 축 이름에 단위 (예: '목표 두께 (µm)')"""
-        return self._add(h, lambda y, r: scatter_chart(self.s, self.x, y, self.w, h + r, series, x_title, y_title,
-                                                       **kw), rows=1, room=1.2)
+    def scatter(self, series, x_title, y_title, h=2.2, title=None, **kw):
+        """산점도 블록. 축 이름에 단위 (예: '목표 두께 (µm)'), title: 그림 제목"""
+        def draw(y, r):
+            g = scatter_chart(self.s, self.x, y, self.w, h + r, series, x_title, y_title, **kw)
+            figure_caption(self.s, title, self.x, y + h + r + 0.02, self.w, key=self._ck(y))
+            return g
+        return self._add(h + CAP_H, draw, rows=1, room=1.2)
 
     def hist(self, values, edges, name="건수", unit="", count_unit="건", h=1.9, **kw):
         """히스토그램 블록 (편집 가능한 세로 막대)"""
@@ -1674,12 +1739,18 @@ class Col:
                 yy += U + gap
         return self._add(lambda: len(items) * _unit_of(self.s, "steps") + gap * (len(items) - 1), draw)
 
-    def gantt(self, periods, tasks, row_h=0.3, **kw):
-        return self._add(0.27 + row_h * len(tasks) + (0.22 if kw.get("today") is not None else 0),
-                         lambda y, r: gantt(self.s, self.x, y, self.w, periods, tasks, row_h=row_h, **kw))
+    def gantt(self, periods, tasks, row_h=0.3, title=None, **kw):
+        """일정 블록. title: 아래 가운데 [그림 #. 제목]"""
+        gh = 0.27 + row_h * len(tasks) + (0.22 if kw.get("today") is not None else 0)
 
-    def image(self, path, h, marks=()):
-        """그림 블록. h 는 최대 높이"""
+        def draw(y, r):
+            end = gantt(self.s, self.x, y, self.w, periods, tasks, row_h=row_h, **kw)
+            figure_caption(self.s, title, self.x, y + gh + 0.02, self.w, key=self._ck(y))
+            return end
+        return self._add(gh + CAP_H, draw)
+
+    def image(self, path, h, marks=(), title=None):
+        """그림 블록. h 는 최대 높이, title: 아래 가운데 [그림 #. 제목]"""
         from PIL import Image as _Im
         with _Im.open(path) as im:
             iw, ih = im.size
@@ -1687,7 +1758,11 @@ class Col:
         if _default_mpl(path):
             _warn(self.s, f"그림 {os.path.basename(path)} 이 matplotlib 기본 색 (주황, 파랑): 그리기 전 mpl_style()")
         pad = 0.12 if marks else 0.0  # 번호 원이 그림 위로 0.17 in 나옴
-        return self._add(real + pad, lambda y, r: screenshot(self.s, path, self.x, y + pad, self.w, real, marks))
+        def draw(y, r):
+            pic = screenshot(self.s, path, self.x, y + pad, self.w, real, marks)
+            figure_caption(self.s, title, self.x, y + pad + real + 0.02, self.w, key=self._ck(y))
+            return pic
+        return self._add(real + pad + CAP_H, draw)
 
     def rule_list(self, title, items, pitch=0.29):
         """items=[(아이콘, 글[, 설명])]"""
@@ -1817,7 +1892,8 @@ class Col:
             bottom = min(bottom, self.top + max(c._natural() for c in g if c.items))
         free = bottom - self.top - need - self.MIN_GAP * gaps
         if free < -1e-6:
-            raise ValueError(f"패널 칸(x {self.x:.2f})이 {-free:.2f} in 넘침: 블록을 줄이거나 표 행 높이를 낮춤")
+            _fail(f"패널 칸(x {self.x:.2f})이 {-free:.2f} in 넘침: 블록을 줄이거나 표 행 높이를 낮춤")
+            free = 0.0
         # 남는 높이를 늘림 한도 있는 블록에 고르게
         grow = [0.0] * len(self.items)
         open_ = [k for k, it in enumerate(self.items) if it[2] and it[3] > 0]
@@ -1878,6 +1954,15 @@ def _reg(s):
         r = {"obst": [], "walls": [], "segs": [], "used": {}, "pending": [], "links": []}
         p._ixreg = r
     return r
+
+
+SOFT = os.environ.get("INTERX_REGRESS") == "1"   # regress.py 만 켬: 엄격 실패도 저장해 그림 비교
+
+
+def _fail(msg):
+    if not SOFT:
+        raise ValueError(msg)
+    print("엄격 실패: " + msg.replace(chr(10), " / "))
 
 
 def _warn(s, msg):
@@ -2216,6 +2301,82 @@ def _near_spots(px, py, w, h, reach=1.2, step_=0.05):
             cand.append((dx * dx + dy * dy, x, y))
     cand.sort()
     return ((x, y) for _, x, y in cand)
+
+
+def _bottom_of(s):
+    """제목 및 요약 줄 아래 도형들의 (왼쪽, 오른쪽, 아래)"""
+    E = 914400
+    xs = [(sh.left / E, (sh.left + sh.width) / E, (sh.top + sh.height) / E) for sh in s.shapes
+          if not sh.is_placeholder and sh.width is not None and sh.top is not None and sh.top / E > 1.6
+          and sh.name not in ("도장",)]
+    return (min(a for a, _, _ in xs), max(b for _, b, _ in xs), max(c for _, _, c in xs)) if xs else None
+
+
+def _place_figure(s):
+    """page(figure=) 장: 모든 도형 아래 가운데에 그림 제목"""
+    R = _reg(s)
+    if "figure" not in R or R.get("figure_done"):
+        return []
+    R["figure_done"] = True
+    bb = _bottom_of(s)
+    if bb is None:
+        return ["figure= 를 줬지만 도식이 없음"]
+    x0, x1, y = bb
+    figure_caption(s, R["figure"], x0, y + 0.06, x1 - x0, key=(99, 0, 0))
+    if y + 0.06 + 0.2 > REPORT_BOTTOM + 0.1:
+        return [f"그림 제목 자리 없음 (도식 아래 {y:.2f} in): 도식 아래를 0.3 in 비움 (DocGrid(bottom=) 를 줄임)"]
+    return []
+
+
+def caption_problems(s):
+    """표마다 [표 ...], 차트와 큰 그림과 구성도마다 [그림 ...]"""
+    E = 914400
+    caps = {k: sum(sh.name == f"IXCAP_{k}" for sh in s.shapes) for k in ("표", "그림")}
+    tables = sum(sh.has_table for sh in s.shapes)
+    figs = sum(sh.has_chart for sh in s.shapes) + sum(
+        sh._element.tag.endswith("}pic") and sh.width / E >= 2.0 for sh in s.shapes if not sh.is_placeholder)
+    if "doc_top" in _reg(s) and not figs:
+        figs = 1   # 구성도 장 (d.page(doc=True))
+    out = []
+    if tables > caps["표"]:
+        out.append(f"표 {tables}개에 표 제목 {caps['표']}개: 표 왼쪽 위 [표 번호. 제목] (Col.table(title=, unit=))")
+    if figs > caps["그림"]:
+        out.append(f"그림 {figs}개(차트, 화면, 구성도)에 그림 제목 {caps['그림']}개: 아래 가운데 [그림 번호. 제목] "
+                   "(블록 title=, 구성도 장은 d.page(..., figure=))")
+    return out
+
+
+def _number_captions(slides):
+    """덱 전체 연번: 장 순서, 장 안은 칸 묶음 위 → 칸 왼쪽 → 블록 위, 구성도 장 제목은 끝"""
+    n = {"표": 0, "그림": 0}
+    for sl in slides:
+        keys = _reg(sl).get("cap_keys", {})
+        caps = sorted((sh for sh in sl.shapes if sh.name in ("IXCAP_표", "IXCAP_그림")),
+                      key=lambda sh: keys.get(sh.shape_id, (round(sh.top / 914400, 1), sh.left / 914400, 0)))
+        for sh in caps:
+            k = sh.name[6:]
+            for r in (r for p in sh.text_frame.paragraphs for r in p.runs):
+                if f"[{k} " in r.text:
+                    n[k] += 1
+                    r.text = re.sub(rf"^\[{k} (#|\d+)\. ", f"[{k} {n[k]}. ", r.text)
+
+
+def diagram_notes(s):
+    """구성도 문법 주의: 선 색은 주 흐름과 보조 흐름 둘까지, 아이콘은 한 세트"""
+    out = []
+    cols = set(s._element.xpath(".//p:cxnSp/p:spPr/a:ln/a:solidFill/a:srgbClr/@val")) - {RED}   # 빨강은 끊김 표시
+    if len(cols) > 2:
+        out.append(f"연결선 색 {len(cols)}종 ({', '.join(sorted(cols))}): 주 흐름 실선과 보조 흐름 점선 둘까지, 구분은 선 모양으로")
+    keys = _reg(s).get("icon_keys", set())
+    icons = {k for k in keys if any(os.path.splitext(f)[0] == k for f in _icon_files())}
+    duo = _duo_keys()
+    if icons & duo and icons - duo:
+        out.append(f"두 색 구성도 아이콘과 옛 색 아이콘이 섞임 ({', '.join(sorted(icons - duo))}): 한 장은 한 세트로")
+    return out
+
+
+def _icon_files():
+    return os.listdir(ICONS)
 
 
 def layout_problems(s):
@@ -2786,13 +2947,15 @@ def _mm_seq(s, lines, x, y, w, h):
     return shapes
 
 
-def mermaid(s, src, x, y, w, h):
-    """Mermaid 를 도형과 붙은 선으로 (flowchart, sequenceDiagram)
+def mermaid(s, src, x, y, w, h, title=None):
+    """Mermaid 를 도형과 붙은 선으로 (flowchart, sequenceDiagram). title: 아래 가운데 [그림 #. 제목]
     - 따옴표는 빼고 <br> 은 줄 바꿈. 지원 밖은 ValueError"""
     lines = [ln.strip() for ln in src.strip().splitlines() if ln.strip() and not ln.strip().startswith("%%")]
     if not lines:
         raise ValueError("mermaid: 글이 비어 있음")
-    return (_mm_seq if lines[0] == "sequenceDiagram" else _mm_flow)(s, lines, x, y, w, h)
+    out = (_mm_seq if lines[0] == "sequenceDiagram" else _mm_flow)(s, lines, x, y, w, h - CAP_H)
+    figure_caption(s, title, x, y + h - CAP_H + 0.02, w)
+    return out
 
 
 # --- 덱
@@ -2800,7 +2963,7 @@ def _apply_ko_breaks(sl):
     """글 조각 하나인 문단에 ko_breaks 적용"""
     def frames():
         for sh in sl.shapes:
-            if sh.is_placeholder:
+            if sh.is_placeholder or sh.name.startswith(("IXCAP_", "IXUNIT")):   # 표 및 그림 제목은 한 줄
                 continue
             if sh.has_text_frame and sh.text_frame.word_wrap is not False:
                 tf = sh.text_frame
@@ -2917,6 +3080,17 @@ class Deck:
             raise ValueError("파일 제목이 비어 있음")
         day = (date or datetime.date.today()).strftime("%y%m%d")
         return os.path.join(folder, f"{title}_{name}_v{str(version).lstrip('v')}_{day}.pptx")
+
+    @staticmethod
+    def _repeat_notes(body):
+        """두 장 연속 같은 패널 폭과 같은 블록 순서면 주의 (출력만)"""
+        def sig(sl):
+            cs = _reg(sl).get("cols", [])
+            return tuple((round(c.w, 1), tuple(getattr(c, "kinds", ()))) for c in cs) if cs else None
+        sigs = [sig(sl) for sl in body]
+        for i in range(1, len(sigs)):
+            if sigs[i] and sigs[i] == sigs[i - 1]:
+                print(f"주의 본문 {i}, {i + 1}장: 패널 폭과 블록 순서가 같음 (틀로 찍은 느낌). 한 장은 블록 조합이나 패널 수를 바꿈")
 
     def lib(self, n):
         """템플릿 n 번째 장 (부품 원본)"""
@@ -3037,13 +3211,15 @@ class Deck:
         s = self.page("평가항목 대응표", lead=f"평가항목 {len(self._criteria)}개와 답한 쪽 번호")
         w, n = REPORT_RIGHT - REPORT_LEFT, len(self._criteria)
         panel(s, REPORT_LEFT, REPORT_TOP, w, REPORT_BOTTOM - REPORT_TOP, "평가항목별 답한 장")
-        rh = min(0.55, max(0.3, (BODY_BOTTOM - BODY_TOP - 0.27) / n))
+        rh = min(0.55, max(0.24, (BODY_BOTTOM - BODY_TOP - 0.27 - CAP_H - 0.3) / n))   # 0.3: 출처 메모
         rows = [["평가항목", "답한 장"]] + [[c, ", ".join(cv.get(c, ["없음"]))] for c in self._criteria]
-        table(s, REPORT_LEFT + PAD, BODY_TOP, [(w - 2 * PAD) * 0.65, (w - 2 * PAD) * 0.35], rows, size=10.5, row_h=rh)
-        notes(s, REPORT_LEFT + PAD, BODY_TOP + 0.27 + rh * n + 0.1, w - 2 * PAD, ["출처: 본문 장 꼬리말 쪽 번호"])
+        table_caption(s, REPORT_LEFT + PAD, BODY_TOP, w - 2 * PAD, "평가항목별 답한 장")
+        table(s, REPORT_LEFT + PAD, BODY_TOP + CAP_H, [(w - 2 * PAD) * 0.65, (w - 2 * PAD) * 0.35], rows, size=10.5,
+              row_h=rh)
+        notes(s, REPORT_LEFT + PAD, BODY_TOP + CAP_H + 0.27 + rh * n + 0.1, w - 2 * PAD, ["출처: 본문 장 꼬리말 쪽 번호"])
 
-    def page(self, subtitle, lead=None, doc=False, notes=None, covers=None):
-        """다음 장. doc: 구성도 장, notes: 노트, covers: 평가항목"""
+    def page(self, subtitle, lead=None, doc=False, notes=None, covers=None, figure=None):
+        """다음 장. doc: 구성도 장, notes: 노트, covers: 평가항목, figure: 구성도 장 그림 제목 (도식 아래 가운데)"""
         if not getattr(self, "_sec", 0):
             raise ValueError("page: 먼저 d.section('절 이름')")
         if getattr(self, "_closed", False):
@@ -3057,6 +3233,8 @@ class Deck:
         title = f"{self._sec}. {self._sec_name}"
         sub = f"{self._sec}-{self._page}. {subtitle}"
         s = (self.doc_slide if doc else self.report_slide)(title, sub, lead=lead, notes=notes)
+        if figure is not None:
+            _reg(s)["figure"] = figure
         for c in covers or ():   # 꼬리말 쪽 번호
             self._covers.setdefault(c, []).append(f"{len(self.prs.slides) - len(self._lib)}쪽")
         return s
@@ -3181,9 +3359,14 @@ class Deck:
                             f"{max(1, len(body) // 5)}장까지): 숫자가 메시지인 장에만")
         for i, sl in enumerate(self.prs.slides, 1):
             _flush(sl)
+            if i > lib_n and sl.slide_layout.name == "본문_소제목 O":
+                problems += [f"{i - lib_n}장: {m}" for m in _place_figure(sl)]
+                problems += [f"{i - lib_n}장: {m}" for m in caption_problems(sl)]
             if i > lib_n:
                 sub = re.sub(r"^\d+-\d+\.\s*|\s*\(.*\)$", "", next(
                     (q.text_frame.text for q in sl.placeholders if q.placeholder_format.idx == 11), ""))
+                for m in diagram_notes(sl):   # 출력만 (저장은 멈추지 않음)
+                    print(f"주의 {i - lib_n}장: {m}")
                 for t in sorted(_reg(sl).get("panel_titles", ())):   # 출력만 (저장은 멈추지 않음)
                     if sub and re.sub(r"\s*\(.*\)$", "", t) == sub:
                         print(f"주의 {i - lib_n}장: 패널 머리 '{t}' 가 소제목과 같은 말: 패널 머리를 내용 이름으로")
@@ -3196,8 +3379,10 @@ class Deck:
                         if p.search(t):
                             print(f"주의 {i - lib_n}장: 금지 문구 '{p.search(t).group()}'")
                             problems.append(f"{i - lib_n}장: 금지 문구 '{p.search(t).group()}' (forbid)")
+        _number_captions(list(self.prs.slides)[lib_n:])
+        self._repeat_notes(body)
         if strict and problems:
-            raise ValueError("덱 문제 " + str(len(problems)) + "건, 저장하지 않음:\n" + "\n".join(problems))
+            _fail("덱 문제 " + str(len(problems)) + "건, 저장하지 않음:\n" + "\n".join(problems))
         if not getattr(self, "_saved", False):
             lst = self.prs.slides._sldIdLst
             for sid in self._lib:
