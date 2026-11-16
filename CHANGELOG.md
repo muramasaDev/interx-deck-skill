@@ -1,5 +1,10 @@
 # 변경 기록
 
+## 1.6.1 (2026-11-16)
+- 구성도 아이콘 123개 추가: 남색 선과 청록 바탕 두 색 세트(Phosphor duotone, Tabler, MIT). 서버, PC, 노트북, 모바일, 사용자, 관리자, 클라우드, DB, 라우터, 방화벽, API, 게이트웨이, Edge, PLC, 센서 등
+- 기술 로고 34개 추가(Simple Icons, CC0, 브랜드 색): docker, kubernetes, python, grafana, apachekafka, redis, nginx, mqtt, nodered, keycloak, pytorch, onnx, nvidia, siemens 등
+- `scripts/build_icons.py`: 이름 목록으로 아이콘과 로고 PNG 및 `_catalog.png` 생성, 라이선스는 `third_party/icons`
+
 ## 1.6.0 (2026-11-16)
 - 패널이 내용에 맞춰 줄어듦: `report_panels(fit=True)` 기본, 같은 줄 패널은 가장 긴 칸의 내용 높이로 같게 줄고 남는 장 공간은 비움. 빈 곳 실패 규칙 삭제(본문 높이의 45% 미만이면 주의만), 옛 높이는 `fit=False`, check.py 아래 여백 판정은 패널 장에서 주의로. `Col.kpi_table(last=)`
 - 검사: 차트나 표가 있는 본문 장의 출처 줄 필수, 자리표시자(TODO, TBD, xxx, lorem, [insert, '텍스트를 입력', '예시 값', '요약 한 줄') 금지, 사내보고 및 제안 덱의 첫 본문 장 '요약', 발표 시간 대비 장 수 주의

@@ -157,8 +157,10 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | 내용이 꼬리말 선에 붙음 | 꼬리말 선 위 0.30 in 비움(자동) |
 
 ## 8. 자산
-- 아이콘 `assets/icons` 158개, 로고 `assets/logos` 10개. 모양과 이름은 각 폴더 `_catalog.png`. 한 장 안에서 같은 아이콘을 두 뜻으로 쓰지 않음(저장이 잡음)
-- 로고: interx_tagline, 기술(minio, kserve, kubeflow, logo_postgresql, influxdb, react_flow), 협력 기관(dgtp, kitech, sangsin_brake). 고객사 로고는 넣지 않음(그 고객 자료에서 사용자가 줄 때만)
+- 아이콘 `assets/icons` 281개, 로고 `assets/logos` 44개. 모양과 이름은 각 폴더 `_catalog.png`. 한 장 안에서 같은 아이콘을 두 뜻으로 쓰지 않음(저장이 잡음)
+- 구성도 기본 아이콘은 남색 선과 청록 바탕의 두 색 세트(Phosphor, Tabler): server_rack, pc_tower, pc, laptop, mobile, user, users_three, user_admin, cloud, db, router, firewall, lan, wifi, api, gateway, edge_box, plc_unit, sensor, factory, robot, shield_ok, lock_key 등. 한 장 안에서는 이 세트와 옛 색 아이콘을 섞지 않음
+- 로고: interx_tagline, 기술(minio, kserve, kubeflow, logo_postgresql, influxdb, react_flow 및 Simple Icons 브랜드 색 34종: docker, kubernetes, python, grafana, apachekafka, redis, nginx, mqtt, nodered, keycloak, pytorch, onnx, nvidia, siemens 등), 협력 기관(dgtp, kitech, sangsin_brake). 고객사 로고는 넣지 않음(그 고객 자료에서 사용자가 줄 때만)
+- 아이콘 추가: `scripts/build_icons.py` 의 SET 또는 BRANDS 에 이름을 넣고 실행 (resvg-py 필요, 이미 있는 파일은 덮지 않음). 라이선스는 `third_party/icons`
 - 템플릿 원본 도형은 `d.clone(s, 장번호, text=..., shape_id=)`
 
 ## 9. 관문 (gate.py) 과 장 검토 목록

@@ -20,3 +20,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# 아이콘 원본 내려받기
+.icon_dl/
