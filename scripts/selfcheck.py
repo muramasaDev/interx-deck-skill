@@ -1,5 +1,6 @@
 """부품을 모두 그려 보는 자체 시험"""
 import datetime
+import hashlib
 import json
 import os
 import sys
@@ -7,7 +8,7 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ixdeck import *  # noqa: E402,F403
-from ixdeck import _linear, _math, etree  # noqa: E402
+from ixdeck import _linear, _math, _reg, etree  # noqa: E402
 
 out = sys.argv[1]
 d = Deck(author="AX Development / 점검")
@@ -216,6 +217,9 @@ assert all(m.startswith("상자를 피하는 선을 못 찾음") for m in layout
 assert layout_problems(bundle_slide) == [], layout_problems(bundle_slide)
 assert layout_problems(complex_slide) == [], layout_problems(complex_slide)
 d.save(out, strict=False)
+_s = d.doc_slide("1-9. note_by 색", "구성도")   # 머리 글은 실패 경로 빨강과 달라야 함
+note_by(_s, db(_s, 3, 3, 1.4, 0.24, "상자"), "머리 글")
+assert _reg(_s)["pending"][-1][4] != RED, "note_by 머리 글이 빨강"
 _d = Deck(author="소속 / 홍길동 연구원")   # 파일 이름 규칙
 _n = _d.filename("과제 이름_예시", "v0.9.0", "x", datetime.date(2026, 1, 2))
 assert os.path.basename(_n) == "과제_이름_예시_홍길동_v0.9.0_260102.pptx", _n
@@ -235,4 +239,674 @@ _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 판 번�
 _v = [json.load(open(os.path.join(_root, f), encoding="utf8")) for f in ("package.json", ".claude-plugin/plugin.json",
                                                                        ".claude-plugin/marketplace.json")]
 assert _v[0]["version"] == _v[1]["version"] == _v[2]["plugins"][0]["version"], "판 번호가 서로 다름"
+# 배치 1: 검사와 발표자 노트, 도장, 숫자 단위 붙임
+import subprocess  # noqa: E402
+import tempfile  # noqa: E402
+import check_ban  # noqa: E402
+import check_text  # noqa: E402
+import deck_text  # noqa: E402
+import update_imnotai  # noqa: E402
+
+_here = os.path.dirname(os.path.abspath(__file__))
+_tmp = tempfile.mkdtemp(prefix="ixself_")
+
+
+def _mini(name, build, **kw):
+    """장 몇 개짜리 시험 덱 (파일 이름 규칙을 지킴)"""
+    m = Deck(author="소속 / 점검", **kw)
+    m.cover("점검", "2026.11.16")
+    m.section("점검")
+    build(m)
+    p_ = os.path.join(_tmp, f"점검_{name}_v0.1.0_261116.pptx")
+    m.save(p_, strict=False)
+    return p_
+
+
+def _py(script, *args, env=None):
+    r = subprocess.run([sys.executable, "-P", os.path.join(_here, script), *args], capture_output=True,
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8", **(env or {})})
+    return r.returncode, (r.stdout + r.stderr).decode("utf8", "replace")
+
+
+def _p1(m):
+    s = m.page("숫자와 단위", lead="요약", notes="말할 내용 하나")
+    text(s, 1, 2, 6, 0.3, "정확도 95.7 %, 24 시간, 범위 1 ~ 4 개, 3 index")
+    stamp(s, "예시")
+    try:
+        stamp(s, "또")
+        raise AssertionError("도장 두 개가 통과함")
+    except ValueError:
+        pass
+    return s
+
+
+_p = _mini("a", _p1)
+_zp = zipfile.ZipFile(_p)
+_x = "".join(_zp.read(n).decode("utf8") for n in _zp.namelist() if n.startswith("ppt/slides/slide"))
+assert "95.7 %" in _x and "24 시간" in _x and "4 개" in _x, "숫자 단위 사이가 NBSP 가 아님"
+assert "1 ~ 4" in _x and "3 index" in _x, "범위와 영어 낱말은 그대로여야 함"
+_sl = Presentation(_p).slides[2]
+assert _sl.notes_slide.notes_text_frame.text == "말할 내용 하나", "발표자 노트가 없음"
+_st = [sh for sh in _sl.shapes if sh.name == "도장"]
+assert len(_st) == 1 and abs(_st[0].rotation - 352) < 0.01, "도장이 없거나 기울지 않음"
+for _bad in (lambda: stamp(_sl, " "), lambda: Deck(author="a / b", purpose="없는 쓰임새"),
+             lambda: Deck(author="a / b", minutes=0)):
+    try:
+        _bad()
+        raise AssertionError("막혀야 할 입력이 통과함")
+    except ValueError:
+        pass
+assert deck_text.titles(_p).strip() == "- 3쪽 1-1. 숫자와 단위: 요약", deck_text.titles(_p)
+_rc, _o = _py("check_ban.py", _p)
+assert _rc == 0, _o
+
+# 금지 표현: 자리표시자
+for _t in ("TODO 정리", "TBD", "xxx 값", "lorem ipsum", "[Insert 이름]", "여기에 텍스트를 입력", "예시 값", "요약 한 줄"):
+    assert check_ban.BAN.search(_t), _t
+for _t in ("Mastodon 서버", "xx 와 xxxl", "예시 장"):
+    assert not check_ban.BAN.search(_t), _t
+
+
+# check.py: 출처 줄, 첫 본문 장 요약, 발표 시간
+def _p2(m):
+    chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+
+
+_rc, _o = _py("check.py", _mini("b", _p2))
+assert "출처 줄이 없음" in _o, _o
+
+
+def _p3(m):
+    s = m.page("차트", lead="요약")
+    chart(s, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+    notes(s, 1, 5.5, 6, ["출처: 시험 결과서 (2026.05)"])
+
+
+_rc, _o = _py("check.py", _mini("c", _p3))
+assert "출처 줄이 없음" not in _o, _o
+_rc, _o = _py("check.py", _mini("d", _p1, purpose="사내보고"))
+assert "'요약' 이 없음" in _o, _o
+
+
+def _p4(m):
+    m.page("요약 및 현황", lead="요약")
+    m.page("둘째", lead="요약")
+    m.page("셋째", lead="요약")
+
+
+_pe = _mini("e", _p4, purpose="제안", minutes=3)
+_rc, _o = _py("check.py", _pe)
+assert "'요약' 이 없음" not in _o and "주의: 본문 3장이 발표 3분" in _o, _o
+assert Presentation(_pe).core_properties.category == "ix-purpose:제안"
+
+
+# check_text: 어휘 사전과 노트
+assert len(check_text.load_lexicon()) > 50, "im-not-ai 어휘 사전을 못 읽음"
+
+
+def _p5(m):
+    s = m.page("어휘", lead="요약", notes="다양한 사례를 든다. 팀 역량 잠금 해제")
+    text(s, 1, 2, 6, 0.3, "팀 역량 잠금 해제 방법")
+
+
+_f, _w = check_text.check(_mini("f", _p5))
+assert any("3쪽 어휘 AST-01" in x for x in _w), _w
+_f2, _w2 = check_text.check(_mini("g", lambda m: text(m.page("어휘", lead="요약"), 1, 2, 6, 0.3, "화면 잠금 해제 방법")))
+assert not any("AST-01" in x for x in _w2), ("화면 잠금은 제외 규칙에 걸려야 함", _w2)
+assert any("3쪽 노트 어휘 AST-01" in x for x in _w), _w
+assert any("3쪽 노트 '다양한'" in x for x in _f), _f
+assert not any("서술체" in x for x in _f), "노트에는 서술체 규칙을 쓰지 않음"
+
+# render.py: 글꼴 없으면 종료 코드 3 (폴더, 등록 값, fc-list)
+import render  # noqa: E402
+
+_rf = (render._font_dirs, render._registry_fonts, render._fc_families)
+_fd = tempfile.mkdtemp(prefix="ixfont_")
+render._font_dirs = lambda: [_fd]
+render._registry_fonts, render._fc_families = (lambda: ["Arial (TrueType)"]), (lambda: "DejaVu Sans")
+assert not render.font_installed()
+render._registry_fonts = lambda: ["Arial (TrueType)", "Noto Sans KR (TrueType)"]
+assert render.font_installed(), "등록 값 Noto Sans KR 을 못 봄"
+render._registry_fonts, render._fc_families = (lambda: []), (lambda: "Noto Sans KR:style=Regular")
+assert render.font_installed(), "fc-list 의 Noto Sans KR 을 못 봄"
+render._fc_families = lambda: ""
+open(os.path.join(_fd, "NotoSansKR-VF.ttf"), "w").close()
+assert render.font_installed(), "글꼴 폴더 파일을 못 봄"
+os.remove(os.path.join(_fd, "NotoSansKR-VF.ttf"))
+assert not render.font_installed()
+_argv = sys.argv
+sys.argv = ["render.py", _p, os.path.join(_tmp, "r")]
+try:
+    render.main()
+    raise AssertionError("글꼴이 없는데 렌더가 시작됨")
+except SystemExit as _ex:
+    assert _ex.code == 3, _ex.code
+sys.argv = _argv
+render._font_dirs, render._registry_fonts, render._fc_families = _rf
+
+# update_imnotai.py: 받기 실패면 기존 파일 유지, 종료 코드 1
+_k = tempfile.mkdtemp(prefix="ixlex_")
+open(os.path.join(_k, "lexicon.json"), "w").write("keep")
+update_imnotai.RAW = "https://127.0.0.1:1/"
+assert update_imnotai.main(_k) == 1 and open(os.path.join(_k, "lexicon.json")).read() == "keep"
+
+# 배치 2: 새 장 유형과 검사
+import contextlib  # noqa: E402
+import io  # noqa: E402
+
+
+def _strict(build, **kw):
+    """strict 저장 결과: 실패 메시지 (통과면 빈 글)"""
+    m = Deck(author="소속 / 점검", **kw)
+    m.cover("점검", "2026.11.16")
+    m.section("점검")
+    build(m)
+    try:
+        m.save(os.path.join(_tmp, "점검_strict_v0.1.0_261116.pptx"))
+    except ValueError as e:
+        return str(e)
+    return ""
+
+
+_m0 = Deck(author="소속 / 점검")
+_m0.section("점검")
+_s0 = _m0.page("블록", lead="요약")
+
+# 글자 한도: 한도 + 1 자는 실패, 한도 자는 통과 (블록 이름이 메시지에 있음)
+for _k, _fn in (("num_cards 제목", lambda c, n: c.num_cards([("가" * n, "설명")])),
+                ("num_cards 설명", lambda c, n: c.num_cards([("제목", "가" * n)])),
+                ("tab_box 줄", lambda c, n: c.tab_box("결론", ["가" * n])),
+                ("kpis 이름", lambda c, n: c.kpis([("1", "건", "가" * n)])),
+                ("section 행", lambda c, n: c.section("제목", ["가" * n])),
+                ("rule_list 글", lambda c, n: c.rule_list("제목", [("doc_id_green", "가" * n)]))):
+    for _n, _hit in ((LIMITS[_k] + 1, True), (LIMITS[_k], False)):
+        _e = _strict(lambda m, fn=_fn, n=_n: fn(Col(m.page("한도", lead="요약"), 1, LIMIT_REF_W), n))
+        assert (f"{_k} " in _e) == _hit, (_k, _n, _e)
+    for _w, _lim in ((LIMIT_REF_W * 2, LIMITS[_k] * 2), (LIMIT_REF_W / 2, LIMITS[_k] // 2)):   # 칸 폭에 비례
+        for _n, _hit in ((_lim + 1, True), (_lim, False)):
+            _e = _strict(lambda m, fn=_fn, n=_n, w=_w: fn(Col(m.page("한도", lead="요약"), 1, w), n))
+            assert (f"{_k} " in _e) == _hit, (_k, _w, _n, _e)
+
+# 차트 단위: y_title 이나 number_format 의 단위 글자가 있어야 저장됨
+for _kw, _ok in (({}, False), ({"y_title": "건수 (건)"}, True), ({"number_format": '0"건"'}, True),
+                 ({"number_format": "0.0%"}, True)):
+    _e = _strict(lambda m, kw=_kw: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, **kw))
+    assert ("y_title" in _e) == (not _ok), (_kw, _e)
+_buf = io.StringIO()
+with contextlib.redirect_stdout(_buf):
+    _mini("h", lambda m: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"],
+                               {k_: [1, 2] for k_ in "abcde"}, number_format='0"건"'))
+assert "계열 5개" in _buf.getvalue(), _buf.getvalue()
+_ch = _mini("i", lambda m: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "bar", ["가", "나"], {"값": [1, 2]},
+                                y_title="처리 건수 (건)"))
+assert "처리 건수 (건)" in "".join(texts for sh_ in Presentation(_ch).slides[2].shapes if sh_.has_chart
+                              for texts in [sh_.chart.value_axis.axis_title.text_frame.text]), "y_title 이 축에 없음"
+
+# KPI 표, 데이터 수집 포인트 표
+_kr = [("수집 성공률", "측정 안 함", "99.5% 이상", "저장 회차 / 수집 회차 × 100", "4차 시험 결과서")]
+for _bad in (lambda: Col(_s0, 1, 11).kpi_table([]), lambda: Col(_s0, 1, 11).kpi_table([("가", "나", "다", "라", " ")]),
+             lambda: Col(_s0, 1, 11).kpi_table([("가", "나", "다", "라")]),
+             lambda: Col(_s0, 1, 11).collect_table([("도금", "전류", "가끔")]),
+             lambda: Col(_s0, 1, 11).collect_table([("도금", "", "자동")])):
+    try:
+        _bad()
+        raise AssertionError("막혀야 할 표 입력이 통과함")
+    except ValueError:
+        pass
+_c0 = Col(_s0, 1, 11).collect_table([("도금", "전류", "자동"), ("검사", "두께", "반자동"), ("출하", "Lot", "수동")])
+_c0.done()
+assert [c.text for c in _c0[0].table.rows[0].cells] == ["공정", "데이터", "집계 방법"]
+
+
+def _kt(src):
+    def b(m):
+        s = m.page("KPI", lead="요약")
+        Col(s, 1, 11, top=2, bottom=2.7).kpi_table(_kr).done()
+        if src:
+            notes(s, 1, 3, 10, [src if isinstance(src, str) else "출처: 4차 시험 결과서 (2026.05)"])
+    return b
+
+
+assert "KPI 표" in _strict(_kt(False)) and "KPI 표" not in _strict(_kt(True))
+assert "KPI 표" in _strict(_kt("기준: 4차 시험 결과서")), "'기준:' 은 출처가 아님"
+assert "KPI 표" not in _strict(_kt("자료: 4차 시험 결과서"))
+
+
+# 평가항목 대응표
+def _cr(both):
+    def b(m):
+        m.criteria(["기술 우수성", "수행 일정"])
+        m.page("가", lead="요약", covers=["기술 우수성"])
+        if both:
+            m.page("나", lead="요약", covers=["수행 일정", "기술 우수성"])
+    return b
+
+
+assert "수행 일정" in _strict(_cr(False))
+assert _strict(_cr(True)) == ""
+_cp = os.path.join(_tmp, "점검_strict_v0.1.0_261116.pptx")
+_cs = Presentation(_cp).slides
+_ct = next(sh_ for sh_ in _cs[-2].shapes if sh_.has_table).table
+assert _cs[-1].slide_layout.name == "앤드페이지_다크네이비" and "평가항목 대응표" in _cs[-2].placeholders[11].text_frame.text
+assert [[c.text for c in r.cells] for r in _ct.rows][1:] == [["기술 우수성", "3쪽, 4쪽"], ["수행 일정", "4쪽"]]
+_rc, _o = _py("check.py", _cp)
+assert "slide5:" not in _o, _o   # 자동으로 만든 장은 check.py 를 통과
+for _bad in (lambda: _m0.criteria([]), lambda: _m0.criteria(["가", "가"]),
+             lambda: _m0.page("없는 항목", covers=["없음"])):
+    try:
+        _bad()
+        raise AssertionError("막혀야 할 평가항목 입력이 통과함")
+    except ValueError:
+        pass
+
+
+# 일정 및 산출물
+def _dl(names, deliv):
+    def b(m):
+        gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [(n, 0, 1, "done") for n in names])
+        m.deliverables(deliv)
+    return b
+
+
+assert _strict(_dl(["설계", "구현"], {"설계": ["설계서"], "구현": ["프로그램"]})) == ""
+_e = _strict(_dl(["설계", "구현"], {"설계": ["설계서"], "시험": ["결과서"]}))
+assert "'시험'" in _e and "'구현'" in _e, _e
+assert _m0.deliverables({"설계": ["설계서", "정의서"]}) == [["단계", "산출물"], ["설계", "설계서, 정의서"]]
+try:
+    _m0.deliverables({"설계": []})
+    raise AssertionError("빈 산출물이 통과함")
+except ValueError:
+    pass
+
+# 영업, 문서 쓰임새
+_rc, _o = _py("check.py", _mini("j", lambda m: [m.page(n, lead="요약") for n in ("회사 소개", "변화")], purpose="영업"))
+assert "첫 본문 장" in _o and "6 ~ 15" in _o, _o
+_rc, _o = _py("check.py", _mini("k", lambda m: [m.page(n, lead="요약") for n in ("변화", "회사 소개", "회사소개 상세")], purpose="영업"))
+assert "회사 소개 장 2" in _o and "첫 본문 장" not in _o, _o
+_rc, _o = _py("check.py", _mini("l", lambda m: [m.page(n, lead="요약") for n in
+                                                ("변화", "승자와 패자", "목표 상태", "기능", "고객 사례", "회사 소개")],
+                                purpose="영업"))
+assert "6 ~ 15" not in _o and "회사 소개 장" not in _o and "첫 본문 장" not in _o, _o
+
+
+def _tabs(m):
+    for k_ in range(5):
+        s_ = m.page(f"표 {k_}", lead="요약")
+        if k_ < 3:
+            table(s_, 1, 2, [3, 3], [["가", "나"], ["1", "2"]])
+            notes(s_, 1, 3, 6, ["출처: 시험 결과서 (2026.05)"])
+
+
+_rc, _o = _py("check.py", _mini("m", _tabs))
+assert "3/5 (절반 넘음)" in _o, _o
+_rc, _o = _py("check.py", _mini("n", _tabs, purpose="문서"))
+assert "절반 넘음" not in _o, _o
+_long = "수집 성공률은 4차 시험에서 99.8%로 검수 기준을 충족했고 " * 3
+assert 70 < len(_long) < 110
+_f, _w = check_text.check(_mini("o", lambda m: text(m.page("긴 줄", lead="요약"), 1, 2, 11, 0.3, _long)))
+assert any("자 문장" in x for x in _w), _w
+_f, _w = check_text.check(_mini("p", lambda m: text(m.page("긴 줄", lead="요약"), 1, 2, 11, 0.3, _long), purpose="문서"))
+assert not any("자 문장" in x for x in _w), _w
+assert "승리 주제" in open(os.path.join(_root, "skills", "using", "references", "review_prompt.md"), encoding="utf8").read()
+
+# Mermaid: 편집 가능한 도형과 붙은 선
+_FLOW = "graph TD" + chr(10) + chr(10).join([" A[시작] --> B[읽기]", " B --> C[검증]", " B -- 실패 --> D[재시도]",
+                                              " C --> E[저장]", " C --> F[알림]", " D --> G[기록]"])
+_SEQ = chr(10).join(["sequenceDiagram", " participant A as 설비", " participant B as 수집기", " participant C as 서버",
+                    " A->>B: 값 요청", " B-->>A: 현재 값", " B->>C: 값 전송", " C-->>B: 저장 완료"])
+
+
+def _mm(m):
+    global _mm_shapes
+    _mm_shapes = mermaid(m.page("흐름", lead="요약"), _FLOW, 1.0, 2.0, 11.3, 4.8)
+    mermaid(m.page("순서", lead="요약"), _SEQ, 1.0, 2.0, 11.3, 4.8)
+
+
+assert _strict(_mm) == ""
+_mp = os.path.join(_tmp, "점검_strict_v0.1.0_261116.pptx")
+_rc, _o = _py("check.py", _mp)   # 연결선 양 끝 붙음, 번호 중복, 장 밖 도형 포함
+assert _rc == 0 and _o.startswith("OK"), _o
+_x3, _x4 = (etree.tostring(sl_._element, encoding="unicode") for sl_ in list(Presentation(_mp).slides)[2:4])
+assert _x3.count("<p:cxnSp>") == 6 == _x3.count("<a:stCxn") == _x3.count("<a:endCxn"), "flowchart 선 6개가 붙어야 함"
+assert _x4.count("<p:cxnSp>") == 4 == _x4.count("<a:endCxn") and "활성 막대" in _x4 and 'prst="line"' in _x4
+assert set(_mm_shapes) == set("ABCDEFG") and _mm_shapes["A"].text_frame.text == "시작"
+for _bad_src in ("graph TD|A --- B", "graph TD|A{결정} --> B", "graph RL|A --> B", "pie|A", "graph TD|A --> A",
+                 "graph TD|A -.-> B", "sequenceDiagram|loop 반복", "sequenceDiagram|A->>A: 자기", "sequenceDiagram|participant A",
+                 "graph TD|A -->", ""):
+    _bad_src = _bad_src.replace("|", chr(10))
+    try:
+        mermaid(_m0.page("지원 밖", lead="요약"), _bad_src, 1.0, 2.0, 11.3, 4.8)
+        raise AssertionError(f"지원 밖 Mermaid 가 통과함: {_bad_src!r}")
+    except ValueError:
+        pass
+try:   # 영역에 안 들어가는 크기
+    mermaid(_m0.page("좁음", lead="요약"), _SEQ, 1.0, 2.0, 3.0, 1.0)
+    raise AssertionError("좁은 영역이 통과함")
+except ValueError:
+    pass
+
+# 기존 덱 고치기: 지정한 장 글만 바뀌고 나머지 파트는 바이트 그대로
+_eo = os.path.join(_tmp, "edit_out.pptx")
+_sha0 = hashlib.sha256(open(_mp, "rb").read()).hexdigest()
+_rc, _o = _py("edit_deck.py", _mp, _eo, "--replace", "3", "시작", "개시", "3", "읽기", "값 20 개 읽기")
+assert _rc == 0 and "3쪽" in _o and "중 다른 것 0개" in _o, _o
+with zipfile.ZipFile(_mp) as _za, zipfile.ZipFile(_eo) as _zb:
+    _diff = [n_ for n_ in _za.namelist() if _za.read(n_) != _zb.read(n_)]
+    assert _za.namelist() == _zb.namelist() and len(_diff) == 1, _diff
+    _x = _zb.read(_diff[0]).decode("utf8")
+    assert "개시" in _x and "시작" not in _x and "20" + chr(160) + "개 읽기" in _x, "바뀐 글과 줄바꿈 방지 공백"
+assert hashlib.sha256(open(_mp, "rb").read()).hexdigest() == _sha0, "원본이 바뀜"
+for _args in (["3", "없는 글", "새 글"], ["99", "시작", "새 글"], ["3", "시작"]):
+    _rc, _o = _py("edit_deck.py", _mp, os.path.join(_tmp, "edit_bad.pptx"), "--replace", *_args)
+    assert _rc != 0 and not os.path.exists(os.path.join(_tmp, "edit_bad.pptx")), _o
+_rc, _o = _py("edit_deck.py", _mp, _mp, "--replace", "3", "시작", "개시")
+assert _rc != 0 and hashlib.sha256(open(_mp, "rb").read()).hexdigest() == _sha0, "원본을 덮음"
+
+# 배치 4: 검토 반영
+import re  # noqa: E402
+import shutil  # noqa: E402
+import edit_deck  # noqa: E402,F401
+import gate  # noqa: E402
+
+_mm_dir = os.path.join(_tmp, "mm0")   # 위 Mermaid 시험 덱 보관 (이후 _strict 가 _mp 를 덮음)
+os.makedirs(_mm_dir)
+_mp0 = os.path.join(_mm_dir, os.path.basename(_mp))
+shutil.copy(_mp, _mp0)
+
+# allow 정규식(보통 공백)이 NBSP 로 바뀐 글에도 맞음
+_ta = "24 시간 늘 수집"
+_rc, _o = _py("check_ban.py", _mini("r", lambda m: text(m.page("허용", lead="요약"), 1, 2, 8, 0.3, _ta), allow=[_ta]))
+assert _rc == 0, ("allow 가 NBSP 글에 안 먹음", _o)
+_rc, _o = _py("check_ban.py", _mini("s", lambda m: text(m.page("허용", lead="요약"), 1, 2, 8, 0.3, _ta)))
+assert _rc == 1 and "늘" in _o, _o
+
+# 출처 줄 (줄 머리 또는 괄호 안). '기준:' 은 아님
+for _t, _ok in (("※ 출처: 시험 결과서", True), ("출처：시험 결과서", True), ("(출처: 시험 결과서)", True),
+                ("그림 1 (자료: 시험 결과서 2026.05.27)", True), ("데이터 출처: MES", True), ("Source: MES", True),
+                ("※ 기준: 본문 장 쪽 번호", False), ("기준: 4차 시험", False), ("자료실: 열람", False),
+                ("출처 없음", False), ("시험 결과 출처를 밝힘", False)):
+    assert bool(check_ban.SRC_LINE.search(_t)) == _ok, (_t, _ok)
+
+
+def _chart_note(line):
+    def b(m):
+        s_ = m.page("차트", lead="요약")
+        chart(s_, 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]}, number_format='0"개"')
+        notes(s_, 1, 5.5, 6, [line])
+    return b
+
+
+_rc, _o = _py("check.py", _mini("t", _chart_note("기준: 4차 시험 결과서")))
+assert "출처 줄이 없음" in _o, "'기준:' 만 있는 장이 통과함"
+_rc, _o = _py("check.py", _mini("u", _chart_note("시험 결과 (자료: 4차 시험 결과서)")))
+assert "출처 줄이 없음" not in _o, _o
+
+# 차트 단위: 통화 기호도 단위
+for _nf in ("$#,##0", "₩#,##0", "€0.0", "¥0"):
+    assert _strict(lambda m, nf=_nf: chart(m.page("차트", lead="요약"), 1, 2, 5, 3, "col", ["가", "나"], {"값": [1, 2]},
+                                         number_format=nf)) == "", _nf
+
+
+# 일정 및 산출물: 마일스톤 행은 대조에서 제외
+def _ms(kind):
+    def b(m):
+        gantt(m.page("일정", lead="요약"), 1, 2, 10, ["1월", "2월"], [("설계", 0, 1, "done"), ("현장 검수", 1.5, 1, kind, "검수")])
+        m.deliverables({"설계": ["설계서"]})
+    return b
+
+
+assert _strict(_ms("mile")) == ""
+assert "'현장 검수'" in _strict(_ms("plan"))
+
+# 간트 막대 글자색: 끝남은 진한 회색, 진행과 예정은 흰색
+_gs = _m0.page("간트", lead="요약")
+gantt(_gs, 1, 2, 8, ["1월", "2월"], [("가", 0, 1, "done", "완료막대"), ("나", 1, 1.5, "now", "진행막대"),
+                                       ("다", 1.5, 2, "plan", "예정막대")])
+_gc = {sh_.text_frame.text: str(sh_.text_frame.paragraphs[0].runs[0].font.color.rgb) for sh_ in _gs.shapes
+       if sh_.has_text_frame and sh_.text_frame.text.endswith("막대")}
+assert _gc == {"완료막대": SLATE9, "진행막대": WHITE, "예정막대": WHITE}, _gc
+
+
+# 카드 목록: numbered=False 면 번호 원 없이 굵은 제목과 설명
+def _cards(numbered):
+    s_ = _m0.page("카드", lead="요약")
+    c_ = Col(s_, 1, 4, top=2, bottom=6)
+    c_.num_cards([("제목 하나", "설명 하나"), ("제목 둘", "설명 둘")], numbered=numbered)
+    c_.done()
+    return s_
+
+
+_s1, _s2 = _cards(True), _cards(False)
+_ov = lambda s_: [sh_.text_frame.text for sh_ in s_.shapes if sh_.has_text_frame and "Oval" in sh_.name]
+assert _ov(_s1) == ["1", "2"] and _ov(_s2) == [], "numbered 가 번호 원을 정하지 못함"
+assert any(sh_.has_text_frame and sh_.text_frame.text.startswith("제목 하나")
+           and sh_.text_frame.paragraphs[0].runs[0].font.bold for sh_ in _s2.shapes)
+
+# 비교 표: 한 표, 바뀐 행의 개선 칸만 남색
+_cc = Col(_m0.page("비교", lead="요약"), 1, 8, top=2, bottom=4)
+_cc.compare_table([("기록 방식", "수기 입력", "자동 수집"), ("기록 간격", "1일", "1초"), ("위치", "PC", "서버")], highlight=(1,))
+_cc.done()
+_ct2 = _cc[0].table
+assert [c.text for c in _ct2.rows[0].cells] == ["항목", "현행", "개선"] and len(_ct2.rows) == 4
+_clr = lambda r_, c_: str(_ct2.cell(r_, c_).text_frame.paragraphs[0].runs[0].font.color.rgb)
+assert _clr(2, 2) == ACCENT and _clr(2, 1) == BLACK and _clr(1, 2) == BLACK and _clr(3, 2) == BLACK, "개선 칸 강조"
+for _bad in (lambda: Col(_m0.page("비교", lead="요약"), 1, 8).compare_table([("가", "나")]),
+             lambda: Col(_m0.page("비교", lead="요약"), 1, 8).compare_table([("가", "나", " ")]),
+             lambda: Col(_m0.page("비교", lead="요약"), 1, 8).compare_table([("가", "나", "다")], highlight=(3,))):
+    try:
+        _bad()
+        raise AssertionError("막혀야 할 비교 표 입력이 통과함")
+    except ValueError:
+        pass
+
+# 규칙 목록 이름표: 왼쪽 위 남색 네모 (가운데 제목과 좌우 선은 없음)
+_rs = _m0.page("목록", lead="요약")
+rule_list(_rs, 1, 2, 4, "이름표", [("doc_id_green", "가")])
+_lab = [sh_ for sh_ in _rs.shapes if sh_.has_text_frame and sh_.text_frame.text == "이름표"]
+assert len(_lab) == 1 and abs(_lab[0].left / 914400 - 1) < 0.001 and abs(_lab[0].top / 914400 - 2) < 0.001
+assert str(_lab[0].fill.fore_color.rgb) == ACCENT and _lab[0].width / 914400 < 4
+
+# 패널 높이 맞춤 시험 (fit, fit=False)
+for _fit in (True, False):
+    _buf = io.StringIO()
+    with contextlib.redirect_stdout(_buf):
+        _fs = _m0.page("줄어듦", lead="요약")
+        _fa, _fb = _fc = report_panels(_fs, ["가", "나"], widths=(6, 6), fit=_fit)
+        _fa.section("제목", ["줄 하나"])
+        _fb.section("제목", ["줄 하나", "줄 둘", "줄 셋"])
+        for _c in _fc:
+            _c.done()
+    _hs = [b_.height / 914400 for b_ in _fc.bodies]
+    assert abs(_hs[0] - _hs[1]) < 0.001, _hs
+    assert (_hs[0] < 2.0) == _fit and (_hs[0] > 4.0) == (not _fit), (_fit, _hs)
+    assert ("빔" in _buf.getvalue()) == (not _fit), _buf.getvalue()
+    assert not [m_ for m_ in layout_problems(_fs) if "빔" in m_ or "45%" in m_], layout_problems(_fs)
+_f = Deck(author="소속 / 점검")   # 줄어든 패널은 엄격 저장을 막지 않음
+_f.cover("점검", "2026.11.16")
+_f.section("점검")
+_fs = _f.page("줄어듦", lead="요약")
+_fa, = _fc = report_panels(_fs, ["가"], widths=(12.8,))
+_fa.section("제목", ["줄 하나"])
+_fa.done()
+_f.save(os.path.join(_tmp, "점검_fit_v0.1.0_261116.pptx"))
+
+# 패널 머리와 소제목이 같은 말이면 출력만 (저장은 멈추지 않음)
+for _pt, _hit in (("일정 현황 (2026.05.28)", True), ("수집 현황", False)):
+    _buf = io.StringIO()
+    with contextlib.redirect_stdout(_buf):
+        _mini("v", lambda m, t=_pt: report_panels(m.page("일정 현황 (2026.05.28)", lead="요약"), [t], widths=(12.8,)))
+    assert ("소제목과 같은 말" in _buf.getvalue()) == _hit, (_pt, _buf.getvalue())
+
+# 날짜 표기: 5종 중 2종 넘게 섞이면 주의 (표지 날짜 YYYY.MM.DD 포함)
+assert check_text.date_kinds(["2026.05.29 기준"]) == {"YYYY.MM.DD": "2026.05.29"}
+assert check_text.date_kinds(["2026.05 결과서", "95.7 %", "v0.1.0", "1500.5 mm"]) == {"YYYY.MM": "2026.05"}
+assert set(check_text.date_kinds(["2026-06-15", "6/15", "6월 15일"])) == {"YYYY-MM-DD", "M/D", "M월 D일"}
+_f, _w = check_text.check(_mini("w", lambda m: text(m.page("날짜", lead="요약"), 1, 2, 8, 0.3, "6월 15일 검수")))
+assert not any("날짜 표기" in x for x in _w), _w
+_f, _w = check_text.check(_mini("x", lambda m: text(m.page("날짜", lead="요약"), 1, 2, 8, 0.3, "6월 15일 및 2026-06-15")))
+assert any("날짜 표기 3종" in x for x in _w), _w
+
+# im-not-ai 어휘 사전: 필드가 빠진 항목은 건너뜀, 갱신은 형식이 맞을 때만
+_good = {"id": "X-1", "headword": "표제", "tier": "change", "regex": "가나", "change_when": {"보고서": "바꿈"}}
+assert check_text.lexicon_entry(_good)[0] == "X-1"
+for _bad in ({**_good, "change_when": {}}, {k_: v_ for k_, v_ in _good.items() if k_ != "headword"},
+             {**_good, "regex": "(["}, {**_good, "tier": "conditional"}):
+    assert check_text.lexicon_entry(_bad) is None, _bad
+_lx = os.path.join(_tmp, "lex.json")
+open(_lx, "w", encoding="utf8").write(json.dumps({"entries": [_good, {"id": "X-2", "tier": "change", "regex": "다"}]}))
+_old_lx, check_text.LEXICON = check_text.LEXICON, _lx
+assert [x[0] for x in check_text.load_lexicon()] == ["X-1"], "필드 빠진 항목이 예외를 냄"
+check_text.LEXICON = _old_lx
+update_imnotai.valid_lexicon(json.dumps({"entries": [_good]}))
+for _bad in ({"entries": [_good, {**_good, "change_when": {}}]}, {"entries": [{**_good, "id": ""}]},
+             {"entries": [{**_good, "tier": "conditional"}]}):
+    try:
+        update_imnotai.valid_lexicon(json.dumps(_bad))
+        raise AssertionError("형식이 틀린 lexicon 이 통과함")
+    except ValueError:
+        pass
+
+# 판 번호: plugin.json 먼저, 없으면 package.json
+_gh = gate.HERE
+_vt = tempfile.mkdtemp(prefix="ixver_")
+os.makedirs(os.path.join(_vt, "scripts"))
+os.makedirs(os.path.join(_vt, ".claude-plugin"))
+gate.HERE = os.path.join(_vt, "scripts")
+assert gate._version() == "?"
+json.dump({"version": "1.0.0"}, open(os.path.join(_vt, "package.json"), "w"))
+assert gate._version() == "1.0.0"
+json.dump({"version": "9.9.9"}, open(os.path.join(_vt, ".claude-plugin", "plugin.json"), "w"))
+assert gate._version() == "9.9.9"
+gate.HERE = _gh
+assert gate._version() == _v[1]["version"]
+
+# 장 순서는 sldIdLst 순서 (파일 번호 순서 아님)
+_PNS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+
+
+def _rezip(src, dst, edit):
+    with zipfile.ZipFile(src) as zi, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zo:
+        for info in zi.infolist():
+            zo.writestr(info, edit(info.filename, zi.read(info.filename)))
+
+
+def _reverse_slides(name, data):
+    if name != "ppt/presentation.xml":
+        return data
+    root = etree.fromstring(data)
+    lst = root.find(f".//{_PNS}sldIdLst")
+    ids = list(lst)
+    for e_ in ids:
+        lst.remove(e_)
+    lst.extend(reversed(ids))
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+_rv = os.path.join(_tmp, "reversed.pptx")
+_rezip(_mp0, _rv, _reverse_slides)
+_hf, _h0 = gate.slide_hashes(_mp0)
+assert len(set(_h0)) == len(_h0) and gate.slide_hashes(_rv)[1] == _h0[::-1], "장 해시가 sldIdLst 순서를 따르지 않음"
+
+# 틀 해시: 관계 파일, media, 테마, 렌더 스크립트 포함
+with zipfile.ZipFile(_mp0) as _zz:
+    _names = _zz.namelist()
+for _pre in ("ppt/slideLayouts/_rels/", "ppt/media/", "ppt/presentation.xml", "ppt/theme/"):
+    _first = next(n_ for n_ in _names if n_.startswith(_pre))
+    _tp = os.path.join(_tmp, "touched.pptx")
+    _rezip(_mp0, _tp, lambda name, data, f=_first: data + b" " if name == f else data)
+    assert gate.slide_hashes(_tp)[0] != _hf, f"{_first} 가 틀 해시에 안 들어감"
+_gt = tempfile.mkdtemp(prefix="ixgate_")
+for _f_ in ("render.py", "render.ps1"):
+    shutil.copy(os.path.join(_here, _f_), os.path.join(_gt, _f_))
+gate.HERE = _gt
+_h_a = gate.slide_hashes(_mp0)[0]
+open(os.path.join(_gt, "render.ps1"), "ab").write(b" ")
+assert gate.slide_hashes(_mp0)[0] != _h_a, "렌더 스크립트가 틀 해시에 안 들어감"
+gate.HERE = _gh
+
+# gate --deck: build 없이 검사, 통과 기록 (렌더는 가짜)
+_real_run, _cmds = gate.run, []
+
+
+def _fake_run(cmd, cwd=None, timeout=600):
+    if os.path.basename(cmd[2]) != "render.py":
+        return _real_run(cmd, cwd, timeout)
+    from PIL import Image as _Img
+    _cmds.append(cmd)
+    sel = cmd[cmd.index("--slides") + 1] if "--slides" in cmd else "all"
+    for i_ in (range(1, len(Presentation(cmd[3]).slides) + 1) if sel == "all" else
+               [] if sel == "none" else map(int, sel.split(","))):
+        _Img.new("RGB", (160, 90), "white").save(os.path.join(cmd[4], f"s{i_}.png"))
+    return 0, ""
+
+
+def _gate_deck(path):
+    gate.run = _fake_run
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc_ = gate.check_deck(path, [])
+    finally:
+        gate.run = _real_run
+    return rc_, buf.getvalue()
+
+
+_img = os.path.join(tempfile.gettempdir(), "interx_gate", os.path.splitext(os.path.basename(_mp0))[0])
+shutil.rmtree(_img, ignore_errors=True)
+_rc, _o = _gate_deck(_mp0)
+assert _rc == 0 and "결과: 통과" in _o and "== 1." not in _o, _o[-600:]
+assert os.path.exists(gate._record(_mp0)) and gate.verify(_mp0) == 0
+assert "- 3쪽 1-1. 흐름: 요약" in open(os.path.join(_img, "titles.md"), encoding="utf8").read()
+_gate_deck(_mp0)   # 같은 덱: 그림 재사용, 렌더 대상 없음
+assert _cmds[-1][_cmds[-1].index("--slides") + 1] == "none", _cmds[-1]
+_sub = os.path.join(_tmp, "sub")
+os.makedirs(_sub)
+_ed = os.path.join(_sub, os.path.basename(_mp0))   # 같은 이름의 고친 덱: 바뀐 장만 렌더
+_rc, _o = _py("edit_deck.py", _mp0, _ed, "--replace", "3", "시작", "개시")
+assert _rc == 0 and "gate.py" in _o and "--deck" in _o, _o
+_gate_deck(_ed)
+assert _cmds[-1][_cmds[-1].index("--slides") + 1] == "3", _cmds[-1]
+_bad_ed = os.path.join(_sub, "점검_bad_v0.1.0_261116.pptx")   # 자리표시자가 들어간 덱은 통과 기록이 없어야 함
+_s3 = edit_deck.slide_parts(zipfile.ZipFile(_ed))[2]
+_rezip(_ed, _bad_ed, lambda n_, d_: d_.replace("개시".encode(), "TODO".encode()) if n_ == _s3 else d_)
+_rc, _o = _gate_deck(_bad_ed)
+assert _rc == 1 and "결과: 실패" in _o and not os.path.exists(gate._record(_bad_ed)), "금지 표현이 통과함"
+_rc, _o = _py("gate.py", "--deck", os.path.join(_tmp, "없는덱.pptx"))
+assert _rc == 1 and "덱 파일이 없음" in _o, _o
+assert _py("gate.py", "--deck")[0] == 2
+
+# edit_deck: 옛 글이 빈 문자열이면 저장하지 않음
+_rc, _o = _py("edit_deck.py", _mp0, os.path.join(_tmp, "edit_empty.pptx"), "--replace", "3", "", "새 글")
+assert _rc != 0 and "빈 문자열" in _o and not os.path.exists(os.path.join(_tmp, "edit_empty.pptx")), _o
+
+# Mermaid: 체인의 건너뛰기, 되돌아가기 선은 우회
+_CH = ["graph TD|A[가] --> B[나]|B --> C[다]|A --> C", "graph TD|A[가] --> B[나]|B --> C[다]|C --> A",
+       "graph TD|A[가] --> B[나]|B --> C[다]|C --> D[라]|D -- 재시도 --> B|A --> C",
+       "graph LR|A[가] --> B[나]|B --> C[다]|A --> C", "graph LR|A[가] --> B[나]|B --> C[다]|C --> A",
+       "graph LR|A[가] --> B[나]|B --> C[다]|C --> D[라]|D -- 실패 --> B|A --> C"]
+for _src in _CH:
+    _e = _strict(lambda m, sr=_src: mermaid(m.page("우회", lead="요약"), sr.replace("|", chr(10)), 1.0, 2.0, 11.3, 4.8))
+    assert _e == "", (_src, _e)
+    _rc, _o = _py("check.py", _mp)
+    assert "장 밖으로" not in _o and "연결선" not in _o, (_src, _o)
+    _zm = zipfile.ZipFile(_mp)
+    _x5 = _zm.read(edit_deck.slide_parts(_zm)[2]).decode("utf8")
+    assert _x5.count("<p:cxnSp>") == _x5.count("<a:stCxn") == _x5.count("<a:endCxn"), "우회선이 도형에 안 붙음"
+    assert int(max(map(int, re.findall(r'name="adj1" fmla="val (\d+)"', _x5)))) > 1000000, "우회선 꺾임이 바깥이 아님"
+# 한 줄 체인이 아닌 그림의 되돌아가는 선은 못 그리고 이유를 알림
+try:
+    mermaid(_m0.page("분기", lead="요약"), chr(10).join(["graph TD", "A[가] --> B[나]", "B --> C[다]", "B --> D[라]",
+                                                       "C --> E[마]", "D --> E", "E --> B"]), 1.0, 2.0, 11.3, 4.8)
+    raise AssertionError("그릴 수 없는 선이 통과함")
+except ValueError as _ex:
+    assert "E -> B" in str(_ex) and "피해" in str(_ex), _ex
+# 노드 글: 따옴표는 빼고 <br> 과 <br/> 는 줄 바꿈
+_sh = mermaid(_m0.page("글", lead="요약"), "graph TD" + chr(10) + 'A["수집<br/>시작"] --> B[읽기<br>실패 시 "재시도"]', 1.0, 2.0, 11.3, 4.8)
+assert _sh["A"].text_frame.text == "수집" + chr(10) + "시작" and _sh["B"].text_frame.text == "읽기" + chr(10) + "실패 시 재시도"
+assert _sh["A"].height == _sh["B"].height and _sh["A"].height / 914400 >= 0.34
+_sq = mermaid(_m0.page("순서", lead="요약"), chr(10).join(["sequenceDiagram", 'participant A as "설비<br/>PLC"',
+                                                          "participant B as 수집기", "A->>B: 값 요청<br/>1초마다"]),
+              1.0, 2.0, 11.3, 4.8)
+assert _sq["A"].text_frame.text == "설비" + chr(10) + "PLC"
+
 print("OK", out, "cxn", x.count("<p:cxnSp>"))

@@ -6,7 +6,9 @@ from pptx import Presentation
 BAN = re.compile(r"축으로|까닭|뜻|몫|(?<![빈])칸|[가-힣]봄\b|씀\b|뺌\b|나옴\b|·|—|–"
                  r"|(?<![가-힣])(?:늘|딱|쭉|좀|그냥|되게|엄청|그만큼|이만큼)(?![가-힣])"  # 구어 부사
                  r"|(?<![가-힣])[새옛](?= )"  # 새 ~, 옛 ~ 대신 역할 이름
-                 r"|(?<=[\d)가-힣] )x(?= [\d(가-힣])")  # 곱하기는 ×
+                 r"|(?<=[\d)가-힣] )x(?= [\d(가-힣])"  # 곱하기는 ×
+                 r"|(?<![A-Za-z])(?i:todo|tbd)(?![A-Za-z])|(?<![A-Za-z])x{3,}(?![A-Za-z])|(?i:lorem|\[insert)"  # 자리표시자
+                 r"|텍스트를 입력|예시 값|요약 한 줄")
 
 def texts(shape):
     if shape.has_text_frame:
@@ -30,19 +32,28 @@ def texts(shape):
         for s in shape.shapes:
             yield from texts(s)
 
+# 출처 줄: 줄 머리 또는 괄호 안의 '출처:' 등 ('기준:' 제외)
+SRC_LINE = re.compile(r"(?:^|[(（\[])\s*(?:※\s*)?(?:데이터\s*출처|출처|자료|source)\s*[:：]", re.I)
+
+
 def allowed(prs):
-    """Deck(allow=) 예외를 지우는 함수 (없으면 None)"""
+    """글을 비교용으로 바꾸고 Deck(allow=) 예외를 지우는 함수"""
     import json
     k = prs.core_properties.keywords or ""
-    if not k.startswith("ix-allow:"):
-        return None
-    pats = [re.compile(p) for p in json.loads(k[len("ix-allow:"):])]
+    pats = [re.compile(p) for p in json.loads(k[len("ix-allow:"):])] if k.startswith("ix-allow:") else []
 
     def clean(t):
+        t = t.replace(chr(160), " ")   # 숫자 및 단위 사이 NBSP 도 공백으로 비교
         for p in pats:   # 하나씩: (?i) 같은 전역 깃발이 섞여도 됨
             t = p.sub(" ", t)
         return t
     return clean
+
+
+def notes_of(slide):
+    """발표자 노트 글 (없으면 빈 글)"""
+    tf = slide.notes_slide.notes_text_frame if slide.has_notes_slide else None
+    return tf.text if tf is not None else ""
 
 
 def slide_texts(slide):
@@ -61,7 +72,7 @@ if __name__ == "__main__":
         prs = Presentation(f)
         ok = allowed(prs)
         for i, s in enumerate(prs.slides, 1):
-            for t in slide_texts(s):
+            for t in list(slide_texts(s)) + [notes_of(s)]:
                 t = ok(t) if ok else t
                 for m in BAN.finditer(t):
                     n += 1

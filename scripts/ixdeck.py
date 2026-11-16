@@ -17,7 +17,7 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
-from check_ban import slide_texts
+from check_ban import SRC_LINE, slide_texts
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(os.path.dirname(HERE), "assets")
@@ -75,6 +75,17 @@ def _font(run, size, bold=False, color=BLACK):
 
 _BOLD_NAME = ("SemiBold", "ExtraBold", "Bold", "Black", "Heavy")
 _KEEP_FONT = ("Wingdings", "Symbol", "Webdings")  # 기호 글꼴. 바꾸면 기호가 깨짐
+# 숫자 및 단위 사이 공백 (줄 갈림 방지용 NBSP 로 바꿀 자리)
+_NUM_UNIT = re.compile(r"(?<=\d) (?=(?:%|℃|[µμ]m|mm|cm|kg|ms|pt|in|m|s|시간|초|분|일|개|건|회|명|대|장|원|배|행|열|줄|월|년)"
+                       r"(?![A-Za-z0-9]))")
+STAMP_X, STAMP_Y = 12.55, 0.2   # 도장 오른쪽 끝, 위
+PURPOSES = ("사내보고", "회의", "고객", "파트너", "문서", "영업", "제안")
+# 블록 글자 한도 (넘으면 저장 실패). 3열 기준 칸 폭의 값이고 칸 폭에 비례
+LIMITS = {"num_cards 제목": 16, "num_cards 설명": 40, "tab_box 줄": 46, "kpis 이름": 12, "section 행": 30,
+          "rule_list 글": 30}
+KPI_HEAD = ["지표", "기존 수치", "목표 수치", "계산식", "근거"]
+COLLECT_HEAD = ["공정", "데이터", "집계 방법"]
+COLLECT_METHODS = ("자동", "반자동", "수동")
 
 
 def normalize_fonts(path):
@@ -140,6 +151,9 @@ def normalize_fonts(path):
                         # lang 이 ko-KR 아니면 낱말 중간 줄 바꿈
                         el.set("lang", "ko-KR")
                         el.set("altLang", "en-US")
+                for t_ in root.iter(qn("a:t")):   # 숫자 및 단위는 줄이 갈리지 않게
+                    if t_.text and " " in t_.text:
+                        t_.text = _NUM_UNIT.sub("\u00a0", t_.text)
                 for el in root.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}ea",
                                     "{http://schemas.openxmlformats.org/drawingml/2006/main}cs"):
                     if el.get("typeface") == "":
@@ -256,14 +270,13 @@ def subhead(s, x, y, w, t, color="299288"):
     text(s, x, y, w, 0.24, t, size=10.5, bold=True, color=color, align="c", anchor="m")
 
 
-def rule_list(s, x, y, w, title, items, pitch=0.29, title_color="299288"):
-    """아이콘 + 굵은 글 목록. 바닥 y 반환"""
+def rule_list(s, x, y, w, title, items, pitch=0.29, color=ACCENT):
+    """아이콘 + 굵은 글 목록, 왼쪽 위 남색 이름표. 바닥 y 반환"""
     if any(len(it) > 2 for it in items):
         pitch = max(pitch, 0.38)
     h = 0.27 + pitch * len(items) + 0.06
-    box(s, x, y + 0.12, w, h - 0.12, fill=None, line=GRAY_L, lw=0.5)
-    tw = min(w - 0.4, 0.16 * len(title) + 0.3)
-    box(s, x + (w - tw) / 2, y, tw, 0.24, title, fill=WHITE, size=10.5, bold=True, color=title_color,
+    box(s, x, y + 0.11, w, h - 0.11, fill=None, line=GRAY_L, lw=0.75)
+    box(s, x, y, min(w, _text_w(title, 9) + 0.3), 0.22, title, fill=color, size=9, bold=True, color=WHITE,
         inset=(0, 0, 0, 0))
     _reg(s).setdefault("list_titles", []).append(title)
     used = _reg(s).setdefault("icon_uses", {})
@@ -346,6 +359,20 @@ def summary(s, t):
     return text(s, 0.57, 1.35, 12.17, 0.32, t, size=12, color=BLACK)
 
 
+def stamp(s, text="예시"):
+    """장 오른쪽 위 기운 빨간 도장 (한 장에 하나)"""
+    if not text or not text.strip():
+        raise ValueError("stamp: 도장 글이 비어 있음")
+    if _reg(s).get("stamp"):
+        raise ValueError("stamp: 한 장에 하나만")
+    w = max(0.9, _text_w(text, 9) + 0.3)
+    sh = box(s, STAMP_X - w, STAMP_Y, w, 0.26, text, fill=None, line=RED, lw=1.5, size=9, bold=True, color=RED,
+             name="도장")
+    sh.rotation = -8
+    _reg(s)["stamp"] = True
+    return sh
+
+
 def notes(s, x, y, w, lines, size=7.26, bold=False):
     """'※' 메모 줄"""
     return text(s, x, y, w, _notes_h(lines, w, size), ["※ " + l for l in lines], size=size, bold=bold)
@@ -379,8 +406,8 @@ def big_arrow(s, x, y, w=0.38, h=0.33, direction="right"):
 
 
 def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, header_color=WHITE,
-          highlight=(), align=None):
-    """rows[0] 머리행. highlight: 주황 행 (0부터)"""
+          highlight=(), align=None, cell_hl=()):
+    """rows[0] 머리행. highlight: 남색 행, cell_hl: 남색 칸"""
     nr, nc = len(rows), len(col_w)
     head_h = min(row_h, 0.27)
     gf = s.shapes.add_table(nr, nc, Inches(x), Inches(y), Inches(sum(col_w)), Inches(head_h + row_h * (nr - 1)))
@@ -403,13 +430,14 @@ def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, hea
             head = i == 0
             c.fill.solid()
             c.fill.fore_color.rgb = _rgb(header_fill if head else WHITE)
-            col = header_color if head else (ACCENT if (i - 1) in highlight else BLACK)
+            hl = (i - 1) in highlight or (i - 1, j) in cell_hl
+            col = header_color if head else (ACCENT if hl else BLACK)
             p = c.text_frame.paragraphs[0]
             a = (align[j] if align else ("c" if head else "l"))
             p.alignment = {"l": PP_ALIGN.LEFT, "c": PP_ALIGN.CENTER, "r": PP_ALIGN.RIGHT}[a]
             r = p.add_run()
             r.text = str(rows[i][j])
-            _font(r, size, bold=head or (i - 1) in highlight, color=col)
+            _font(r, size, bold=head or hl, color=col)
             tcpr = c._tc.get_or_add_tcPr()
             for side in ("a:lnL", "a:lnR", "a:lnT", "a:lnB"):
                 ln = etree.SubElement(tcpr, qn(side), w="6350")
@@ -593,12 +621,14 @@ def _site(shape, side):
     return _SITES[kind][side]
 
 
-def connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=None, mid=0.5, text=None):
-    """붙은 연결선. text 는 선 이름"""
+def connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=None, mid=0.5, text=None,
+            bypass=None):
+    """붙은 연결선. text 는 선 이름, bypass 는 바깥 우회 거리"""
     _before_draw(s)
-    c = _connect(s, a, side_a, b, side_b, color, width, head, dash, mid)
+    c = _connect(s, a, side_a, b, side_b, color, width, head, dash, mid, bypass=bypass)
     R = _reg(s)
-    pts = _route(a, side_a, b, side_b, mid, check=False)
+    pts = (_bypass_pts(a, side_a, b, side_b, bypass) if bypass
+           else _route(a, side_a, b, side_b, mid, check=False))
     R["segs"].extend(zip(pts, pts[1:]))
     R["links"].append((pts, a.shape_id, b.shape_id, f"{a.name} -> {b.name}"))
     for sh, sd in ((a, side_a), (b, side_b)):
@@ -629,8 +659,21 @@ def line_label(s, a, side_a, b, side_b, t, mid=0.5, color=SLATE9):
     return right_of(vx, (ya + yb) / 2)
 
 
-def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=None, mid=0.5, htype="triangle"):
-    """a.side_a 에서 b.side_b 로 붙는 연결선"""
+BYPASS_TINY = 0.0014   # 바깥 우회선의 바탕 폭 (in). 꺾임 위치 = 폭 x adj
+
+
+def _bypass_pts(a, sa, b, sb, off):
+    """같은 쪽 변끼리 바깥으로 도는 선의 꺾임점 (right, bottom)"""
+    (x1, y1), (x2, y2) = _pt(a, sa), _pt(b, sb)
+    if sa != sb or sa not in ("right", "bottom"):
+        raise ValueError(f"우회선은 right 와 right 또는 bottom 과 bottom 만: {sa}, {sb}")
+    return ([(x1, y1), (x1 + off, y1), (x1 + off, y2), (x2, y2)] if sa == "right"
+            else [(x1, y1), (x1, y1 + off), (x2, y1 + off), (x2, y2)])
+
+
+def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=None, mid=0.5, htype="triangle",
+             bypass=None):
+    """a.side_a 에서 b.side_b 로 붙는 선. bypass: 바깥 우회 거리"""
     (x1, y1), (x2, y2) = _pt(a, side_a), _pt(b, side_b)
     ha, hb = side_a in ("left", "right"), side_b in ("left", "right")
     swap = False
@@ -640,7 +683,10 @@ def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=No
         ha, hb = True, False
         swap = True
     straight = abs(x1 - x2) < 0.005 or abs(y1 - y2) < 0.005
-    if straight and ha == hb:
+    if bypass:   # 같은 줄의 두 변: 폭 거의 0, 꺾임을 크게
+        prst, rot = "bentConnector3", 0 if ha else 90
+        mid = bypass / BYPASS_TINY
+    elif straight and ha == hb:
         prst, rot = "straightConnector1", 0
     elif ha and hb:
         prst, rot = "bentConnector3", 0
@@ -654,6 +700,9 @@ def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=No
     for k in ("flipH", "flipV", "rot"):
         xfrm.attrib.pop(k, None)
     dx, dy = x2 - x1, y2 - y1
+    if bypass:
+        dx, dy = (BYPASS_TINY, dy) if rot == 0 else (dx, BYPASS_TINY)
+        x2, y2 = x1 + dx, y1 + dy
     if rot == 0:
         ox, oy, w, h = min(x1, x2), min(y1, y2), abs(dx), abs(dy)
         if dx < 0:
@@ -677,7 +726,7 @@ def _connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=No
     geom.set("prst", prst)
     av = geom.find(qn("a:avLst"))
     if prst == "bentConnector3" and abs(mid - 0.5) > 1e-6:
-        etree.SubElement(av, qn("a:gd"), name="adj1", fmla=f"val {int(mid * 100000)}")
+        etree.SubElement(av, qn("a:gd"), name="adj1", fmla=f"val {round(mid * 100000)}")
     nv = sp.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
     etree.SubElement(nv, qn("a:stCxn"), id=str(a.shape_id), idx=str(_site(a, side_a)))
     etree.SubElement(nv, qn("a:endCxn"), id=str(b.shape_id), idx=str(_site(b, side_b)))
@@ -714,6 +763,8 @@ REPORT_TOP, REPORT_BOTTOM = 1.86, round(FOOTER_Y - FOOTER_GAP, 3)
 REPORT_LEFT, REPORT_RIGHT = 0.29, 13.09
 REPORT_WIDTHS = (3.94, 3.21, 3.60)
 PAD = 0.29                                   # 패널 안 좌우 여백
+FIT_GAP = 0.18                                # 패널 칸 블록 사이 기본 틈
+LIMIT_REF_W = sum(REPORT_WIDTHS) / 3 - 2 * PAD   # 글자 한도 기준 칸 폭 (3열 평균)
 BODY_TOP, BODY_BOTTOM = 2.42, round(REPORT_BOTTOM - 0.2, 3)   # 패널 안 위아래 여백
 DOC_TOP, DOC_BOTTOM = 2.21, min(6.81, REPORT_BOTTOM)
 
@@ -778,8 +829,9 @@ def _chart_font(ch):
 
 
 def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="0", legend=None, colors=None,
-          vmax=None, labels=True):
-    """편집 가능한 차트. kind: col, bar, stack, line"""
+          vmax=None, labels=True, y_title=None):
+    """편집 가능한 차트. kind: col, bar, stack, line
+    - y_title 이나 number_format 의 단위 글자 필요, 계열은 4개까지"""
     from pptx.chart.data import CategoryChartData
     from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_MARKER_STYLE
     types = {"col": XL_CHART_TYPE.COLUMN_CLUSTERED, "bar": XL_CHART_TYPE.BAR_CLUSTERED,
@@ -788,6 +840,10 @@ def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="
         raise ValueError(f"chart kind '{kind}' 없음: {list(types)}")
     if not categories or not series:
         raise ValueError("chart: 항목이나 계열이 없음")
+    if not y_title and not re.search(r'"[^"]+"|%|[$₩€¥]', number_format):
+        _warn(s, "차트 단위가 없음: y_title='건수 (건)' 또는 number_format='0\"건\"'")
+    if len(series) > 4:
+        print(f"주의: 차트 계열 {len(series)}개 (4개 넘으면 색 구분이 어려움)")
     if kind == "bar":  # 가로 막대는 거꾸로 넣어야 첫 항목이 위
         n_ = len(categories)
         categories = list(reversed(categories))
@@ -816,6 +872,8 @@ def chart(s, x, y, w, h, kind, categories, series, highlight=(), number_format="
     va.tick_labels.number_format = number_format
     va.tick_labels.number_format_is_linked = False
     va.tick_labels.font.size = Pt(7.26)
+    if y_title:
+        _axis_title(va, y_title)
     if kind != "line":
         va.minimum_scale = 0
     if vmax is not None:
@@ -1092,6 +1150,7 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None, today_
     """일정 표. kind: done, now, plan, mile"""
     if not periods or not tasks:
         raise ValueError("gantt: 기간이나 항목이 없음")
+    _reg(s).setdefault("gantt_names", []).extend(t[0] for t in tasks if t[3] != "mile")   # d.deliverables 대조용, 마일스톤 제외
     pw = (w - label_w) / len(periods)
     hh = 0.27
     box(s, x, y, label_w, hh, "항목", fill=TBL_HEAD, line=WHITE, lw=0.5, size=7.26, bold=True, color=WHITE)
@@ -1102,6 +1161,7 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None, today_
     for i in range(1, len(periods)):
         box(s, x + label_w + i * pw - 0.0035, y + hh, 0.007, body_h, fill=LINE_L)
     fills = {"done": GRAY_L, "now": ACCENT, "plan": SLATE6}
+    bar_txt = {"done": SLATE9, "now": WHITE, "plan": WHITE}   # 연한 막대 위는 진한 글자
     for r, t in enumerate(tasks):
         name, a, b, kind = t[:4]
         note = t[4] if len(t) > 4 else ""
@@ -1122,7 +1182,8 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None, today_
             if kind not in fills:
                 raise ValueError(f"gantt 종류 '{kind}' 없음: done, now, plan, mile")
             box(s, x + label_w + a * pw + 0.03, ry + 0.07, max((b - a) * pw - 0.06, 0.05), row_h - 0.14, note,
-                fill=fills[kind], geom="round", radius=0.5, size=6.35, bold=True, color=WHITE, inset=(0.04, 0, 0.04, 0))
+                fill=fills[kind], geom="round", radius=0.5, size=6.35, bold=True, color=bar_txt[kind],
+                inset=(0.04, 0, 0.04, 0))
     if today is not None:
         tx = x + label_w + today * pw
         box(s, tx, y + hh, 0.001, body_h, fill=None, line=RED, lw=1, dash="dash")
@@ -1132,6 +1193,21 @@ def gantt(s, x, y, w, periods, tasks, row_h=0.3, label_w=2.0, today=None, today_
 
 class _Cols(list):
     """report_panels 결과: 칸 목록 + gaps"""
+    fit = False
+
+    def shrink(self):
+        """모든 칸 done() 뒤 패널을 내용 높이로 줄임"""
+        end = max(c._end for c in self) + (REPORT_BOTTOM - BODY_BOTTOM)
+        if end < self.bottom - 0.01:
+            for b_ in self.bodies:
+                b_.height = Inches(end - self.top - 0.29)
+            for sh in self.mids:   # 패널 틈 화살표와 배지는 새 가운데로
+                sh.top += Inches((end - self.bottom) / 2)
+            for sh in self.foot:
+                sh.top += Inches(end - self.bottom)
+            self.bottom = end
+        if self.bottom - self.top < 0.45 * (REPORT_BOTTOM - REPORT_TOP):
+            _notice(self.s, f"패널 높이 {self.bottom - self.top:.2f} in (본문 높이의 45% 미만): 내용이 너무 적은 장")
 
 
 def banner(s, t, tags=None, current=None, y=REPORT_TOP, x=None, w=None, h=0.4):
@@ -1151,8 +1227,9 @@ def banner(s, t, tags=None, current=None, y=REPORT_TOP, x=None, w=None, h=0.4):
     return y + h + 0.12
 
 
-def report_panels(s, titles, widths=None, arrows=False, hub_gap=None, steps=None, top=REPORT_TOP, footnote=None):
-    """보고형 패널과 칸 (Col) 목록"""
+def report_panels(s, titles, widths=None, arrows=False, hub_gap=None, steps=None, top=REPORT_TOP, footnote=None,
+                  fit=True):
+    """보고형 패널과 칸 (Col) 목록. fit 이면 패널이 내용 높이로 줄어듦"""
     n = len(titles)
     if n == 0:
         raise ValueError("패널 제목이 없음")
@@ -1170,21 +1247,27 @@ def report_panels(s, titles, widths=None, arrows=False, hub_gap=None, steps=None
             gaps = [0.67] * (n - 1)
             gaps[hub_gap] = room - 0.67 * (n - 2)
     bottom = REPORT_BOTTOM - (0.22 if footnote else 0)
-    if footnote:  # 패널 아래 각주 한 줄
-        text(s, REPORT_LEFT, bottom + 0.04, REPORT_RIGHT - REPORT_LEFT, 0.17, footnote, size=6.35, color=SLATE9)
-    mid = (top + 0.29 + bottom) / 2
     cols, x = _Cols(), REPORT_LEFT
+    cols.s, cols.fit, cols.top, cols.bottom = s, fit, top, bottom
+    cols.bodies, cols.mids, cols.foot = [], [], []
+    if footnote:  # 패널 아래 각주 한 줄
+        cols.foot.append(text(s, REPORT_LEFT, bottom + 0.04, REPORT_RIGHT - REPORT_LEFT, 0.17, footnote, size=6.35,
+                              color=SLATE9))
+    mid = (top + 0.29 + bottom) / 2
     cols.gaps = []
     for i, (t, w) in enumerate(zip(titles, widths)):
-        panel(s, x, top, w, bottom - top, t)
+        cols.bodies.append(panel(s, x, top, w, bottom - top, t))
         _reg(s).setdefault("panel_titles", set()).add(t)
         cols.append(Col(s, x + PAD, w - 2 * PAD, top=top + (BODY_TOP - REPORT_TOP), bottom=bottom - (REPORT_BOTTOM - BODY_BOTTOM)))
+        cols[-1].grp = cols
         if i < n - 1:
             cols.gaps.append((x + w, x + w + gaps[i]))
+            n0 = len(s.shapes)
             if steps and i < len(steps) and steps[i]:
                 step_badge(s, x + w, x + w + gaps[i], mid, *steps[i])
             elif arrows and i != hub_gap:
                 big_arrow(s, x + w + gaps[i] / 2 - 0.19, mid - 0.165)
+            cols.mids += list(s.shapes)[n0:]
             x += w + gaps[i]
     return cols
 
@@ -1450,6 +1533,14 @@ def _alt_content(tb):
     parent.insert(idx, ac)
 
 
+def _limit(s, key, texts, w=LIMIT_REF_W):
+    """블록 글자 한도(LIMITS x 칸 폭 비례) 넘는 글은 경고. strict 저장이 멈춤"""
+    lim = int(LIMITS[key] * w / LIMIT_REF_W + 1e-6)
+    for t_ in texts:
+        if len(t_) > lim:
+            _warn(s, f"{key} {len(t_)}자 (한도 {lim}자, 칸 폭 {w:.2f} in): '{t_[:20]}'")
+
+
 class Col:
     """패널 안 세로 칸, done() 에서 높이 분배"""
     MIN_GAP, MAX_GAP, MAX_ROW = 0.12, 0.50, 0.32
@@ -1496,6 +1587,34 @@ class Col:
                          lambda y, r: table(self.s, self.x, y, cw, rows, row_h=row_h + r, **kw),
                          rows=len(rows) - 1, room=max(self.MAX_ROW - row_h, 0))
 
+    def _fixed_table(self, head, rows, ratio, row_h, **kw):
+        """머리행 고정 표. 빈 칸이면 ValueError"""
+        if not rows:
+            raise ValueError(f"{head[0]} 표 행이 없음")
+        for r in rows:
+            if len(r) != len(head) or any(not str(c).strip() for c in r):
+                raise ValueError(f"표 행은 {head} 칸을 모두 채움: {r}")
+        return self.table([head, *[list(r) for r in rows]], ratio=ratio, row_h=row_h, **kw)
+
+    def kpi_table(self, rows, row_h=0.3, last=KPI_HEAD[-1]):
+        """KPI 표. rows=[(지표, 기존, 목표, 계산식, 근거)]. last: 마지막 열 이름"""
+        _reg(self.s)["kpi_table"] = True
+        return self._fixed_table([*KPI_HEAD[:-1], last], rows, [1.25, 1, 1.3, 2.25, 2.2], row_h)
+
+    def compare_table(self, rows, left="현행", right="개선", highlight=(), row_h=0.3):
+        """현행 및 개선 한 표. highlight: 바뀐 행 (0부터)"""
+        n = len(rows)
+        if any(not isinstance(i, int) or not 0 <= i < n for i in highlight):
+            raise ValueError(f"compare_table highlight {tuple(highlight)} 는 행 번호 0 ~ {n - 1}")
+        return self._fixed_table(["항목", left, right], rows, [1, 1.6, 1.6], row_h, cell_hl=[(i, 2) for i in highlight])
+
+    def collect_table(self, rows, row_h=0.3, first="공정"):
+        """수집 항목 표. first: 첫 열 이름 (기본 '공정')"""
+        for r in rows:
+            if len(r) == 3 and r[2] not in COLLECT_METHODS:
+                raise ValueError(f"집계 방법 '{r[2]}' 은 {COLLECT_METHODS} 중 하나")
+        return self._fixed_table([first, *COLLECT_HEAD[1:]], rows, [1, 2.4, 1], row_h)
+
     def chart(self, kind, categories, series, h=1.9, title=None, **kw):
         """차트 블록. title 은 파란 9pt 제목"""
         th = 0.26 if title else 0
@@ -1522,6 +1641,7 @@ class Col:
 
     def kpis(self, items, h=0.85, gap=0.15):
         """핵심 수치 한 줄. items=[(값, 단위, 이름)]"""
+        _limit(self.s, "kpis 이름", [it[2] for it in items], self.w)
         R = _reg(self.s)
         R["kpi_rows"] = R.get("kpi_rows", 0) + 1
         n = len(items)
@@ -1533,6 +1653,7 @@ class Col:
 
     def section(self, title, rows, row_h=0.3, **kw):
         """회색 머리 띠 목록"""
+        _limit(self.s, "section 행", rows, self.w)
         return self._add(0.27 + row_h * len(rows), lambda y, r: section(self.s, self.x, y, self.w, title, rows,
                                                                        row_h=row_h + r, **kw),
                          rows=len(rows), room=max(0.36 - row_h, 0))
@@ -1570,6 +1691,7 @@ class Col:
 
     def rule_list(self, title, items, pitch=0.29):
         """items=[(아이콘, 글[, 설명])]"""
+        _limit(self.s, "rule_list 글", [it[1] for it in items], self.w)
         kind = "rule_desc" if any(len(it) > 2 for it in items) else "rule"
         if kind == "rule_desc":
             pitch = max(pitch, 0.38)
@@ -1582,6 +1704,7 @@ class Col:
         last = (label.split() or [""])[-1]   # 결함, 포함 같은 두 글자 명사는 통과
         if not last or re.search(r"[가-힣]{2}(함|됨|듦)$|(했음|있음|없음|하기|한다|된다|이다)$", last):
             _warn(self.s, f"이름표 '{label}' 는 명사로 (예: '결론', '예측 대상')")
+        _limit(self.s, "tab_box 줄", lines, self.w)
         w = self.w - 0.32
         body_txt = lambda: sum(_nl("• " + ln, w, 8) for ln in lines) * _lh(8)
         _unit(self.s, "tab_box", 0.14 + body_txt() + 0.12)
@@ -1598,9 +1721,12 @@ class Col:
         _reg(self.s).setdefault("tab_labels", []).append(label)
         return self._add(lambda: 0.11 + _unit_of(self.s, "tab_box"), draw)
 
-    def num_cards(self, items, color=ACCENT):
-        """번호 카드. items=[(제목, 설명)]"""
-        w = self.w - 0.12 - NUM_D - 0.1 - 0.1
+    def num_cards(self, items, color=ACCENT, numbered=True):
+        """카드 목록. numbered=False 면 번호 원 없음"""
+        _limit(self.s, "num_cards 제목", [ttl for ttl, _ in items], self.w)
+        _limit(self.s, "num_cards 설명", [x_ for _, d in items for x_ in (d if isinstance(d, list) else [d or ""])], self.w)
+        lead = 0.12 + (NUM_D + 0.1 if numbered else 0)
+        w = self.w - lead - 0.1
         for ttl, d in items:
             _unit(self.s, "num_cards", _td_h(ttl, d, w) + 0.2)
         gap = 0.12
@@ -1610,8 +1736,9 @@ class Col:
             yy = y
             for n, (ttl, d) in enumerate(items, 1):
                 box(self.s, self.x, yy, self.w, U, fill=WHITE, line=GRAY_L, lw=0.75, geom="round", radius=0.08)
-                top = title_desc(self.s, self.x + 0.12 + NUM_D + 0.1, yy, w, U, ttl, d)
-                num_badge(self.s, self.x + 0.12, top + (_lh(9) - NUM_D) / 2, n, color)
+                top = title_desc(self.s, self.x + lead, yy, w, U, ttl, d)
+                if numbered:
+                    num_badge(self.s, self.x + 0.12, top + (_lh(9) - NUM_D) / 2, n, color)
                 yy += U + gap
         return self._add(lambda: len(items) * _unit_of(self.s, "num_cards") + gap * (len(items) - 1), draw)
 
@@ -1676,13 +1803,19 @@ class Col:
         if getattr(self, "_done", False):
             raise ValueError("done() 은 칸마다 한 번만 부른다 (두 번 부르면 도형이 겹침)")
         self._done = True
+        self._end = self.top
+        g = getattr(self, "grp", None)
         if not self.items:
             _warn(self.s, f"패널 칸이 비었음 (x {self.x:.2f}). 블록을 넣거나 패널을 뺌")
+            self._shrink_if_last(g)
             return self.top
         self.items = [((h() if callable(h) else h), d_, n_, r_) for h, d_, n_, r_ in self.items]
         need = sum(i[0] for i in self.items)
         gaps = len(self.items) - 1
-        free = self.bottom - self.top - need - self.MIN_GAP * gaps
+        bottom = self.bottom
+        if g is not None and g.fit:   # 같은 줄에서 가장 긴 칸의 높이에 맞춤
+            bottom = min(bottom, self.top + max(c._natural() for c in g if c.items))
+        free = bottom - self.top - need - self.MIN_GAP * gaps
         if free < -1e-6:
             raise ValueError(f"패널 칸(x {self.x:.2f})이 {-free:.2f} in 넘침: 블록을 줄이거나 표 행 높이를 낮춤")
         # 남는 높이를 늘림 한도 있는 블록에 고르게
@@ -1702,9 +1835,23 @@ class Col:
             self.out.append(draw(y, g_))
             y += h + g_ * n + gap
         y -= gap
-        if self.bottom - y > 0.3:
-            _warn(self.s, f"패널 칸 아래 {self.bottom - y + 0.2:.2f} in 빔 (x {self.x:.2f}). 블록을 더하거나 패널을 줄임")
+        self._end = y
+        if g is None or not g.fit:
+            if self.bottom - y > 0.3:
+                _notice(self.s, f"패널 칸 아래 {self.bottom - y + 0.2:.2f} in 빔 (x {self.x:.2f}). fit=True 로 패널을 줄임")
+        else:
+            self._shrink_if_last(g)
         return y
+
+    def _natural(self):
+        """블록 높이 + 고른 틈 (done 전후 같음)"""
+        hs = [(h() if callable(h) else h) for h, *_ in self.items]
+        return sum(hs) + FIT_GAP * max(len(hs) - 1, 0)
+
+    @staticmethod
+    def _shrink_if_last(g):
+        if g is not None and g.fit and all(getattr(c, "_done", False) for c in g):
+            g.shrink()
 
 
 def doc_columns(right="source"):
@@ -1736,6 +1883,11 @@ def _reg(s):
 def _warn(s, msg):
     """경고를 모은다. strict 저장이면 멈춤"""
     _reg(s).setdefault("warn", []).append(msg)
+    print("주의: " + msg)
+
+
+def _notice(s, msg):
+    """주의만 출력. 저장은 멈추지 않음"""
     print("주의: " + msg)
 
 
@@ -2408,7 +2560,7 @@ class _Sub:
 
 def note_by(s, shape, head, lines=()):
     """상자 옆 빈 자리에 설명 (head, lines)"""
-    _reg(s)["pending"].append(("note", shape, head, list(lines), RED, None))
+    _reg(s)["pending"].append(("note", shape, head, list(lines), SLATE9, None))
 
 
 def step_by(s, shape, n, t=None, where="auto", color=ACCENT, cond=None, dx=0.0):
@@ -2436,6 +2588,211 @@ def stack_bars(s, x, y, w, title, sub, n=2, pitch=0.6, dots=True):
                      inset=(0.02, 0, 0.02, 0)))
     if dots:
         more(s, x + w / 2, y + n * pitch - 0.08)
+
+
+# --- Mermaid 를 편집 가능한 도형으로
+_MM_NODE = re.compile(r"\s*([A-Za-z_]\w*)(?:\[([^\[\]]+)\])?\s*")
+_MM_EDGE = re.compile(r"\s*(?:--\s+([^>]+?)\s+-->|-->)\s*")
+_MM_PART = re.compile(r"^participant\s+(\w+)(?:\s+as\s+(.+))?$")
+_MM_MSG = re.compile(r"^(\w+)\s*(-->>|->>)\s*(\w+)\s*:\s*(.+)$")
+MM_NODE_H = 0.34    # 노드와 참가자 상자 높이 (한 줄)
+MM_LINE_H = 0.16    # 줄이 하나 늘 때 더하는 높이
+MM_BYPASS0, MM_BYPASS_STEP = 0.3, 0.22   # 체인 옆 우회선: 첫 거리, 겹치는 선마다 더하는 거리 (in)
+
+
+def _mm_text(t, br="\n"):
+    """노드 글: 따옴표 제거, <br> 은 줄 바꿈 (br)"""
+    return re.sub(r"\s*<br\s*/?>\s*", br, t.replace('"', "")).strip()
+
+
+def _mm_size(texts):
+    """글 모음에 맞는 상자 (폭, 높이)"""
+    ls = [ln for t in texts for ln in t.split("\n")]
+    n = max(len(t.split("\n")) for t in texts)
+    return max(0.9, max(_text_w(ln, 7.26) for ln in ls) + 0.3), max(MM_NODE_H, MM_LINE_H * n + 0.08)
+
+
+def _mm_levels(spans):
+    """겹치는 구간끼리 다른 번호 (우회선 거리 층)"""
+    lv = []
+    for i, (lo, hi) in enumerate(spans):
+        used = {lv[j] for j, (l2, h2) in enumerate(spans[:i]) if lo <= h2 and l2 <= hi}
+        lv.append(next(k for k in itertools.count() if k not in used))
+    return lv
+
+
+def _mm_parse_flow(lines):
+    """flowchart 줄을 (가로 여부, 노드, 선) 으로"""
+    head = lines[0].split()
+    if len(head) != 2 or head[0] not in ("graph", "flowchart") or head[1] not in ("TD", "TB", "LR"):
+        raise ValueError(f"mermaid: '{lines[0]}' 지원 밖 (graph TD, graph TB, graph LR, sequenceDiagram 만)")
+    nodes, edges = {}, []
+    for ln in lines[1:]:
+        pos, prev, lab = 0, None, None
+        while True:
+            m = _MM_NODE.match(ln, pos)
+            if not m:
+                raise ValueError(f"mermaid: '{ln}' 지원 밖 문법 (A[이름], A --> B, A -- 글 --> B 만)")
+            nid, t = m.group(1), m.group(2)
+            if t:
+                nodes[nid] = _mm_text(t) or nid
+            else:
+                nodes.setdefault(nid, nid)
+            if prev is not None:
+                if prev == nid:
+                    raise ValueError(f"mermaid: '{ln}' 자기 자신으로 가는 선은 지원 밖")
+                edges.append((prev, nid, lab))
+            prev, pos = nid, m.end()
+            if pos >= len(ln):
+                break
+            e = _MM_EDGE.match(ln, pos)
+            if not e or e.end() >= len(ln):
+                raise ValueError(f"mermaid: '{ln}' 지원 밖 문법 (A[이름], A --> B, A -- 글 --> B 만)")
+            lab, pos = _mm_text(e.group(1) or "", " ") or None, e.end()
+    return head[1] == "LR", nodes, edges
+
+
+def _mm_layers(nodes, edges):
+    """가장 긴 경로로 층 나눔 (되돌아가는 선 제외)"""
+    out = {i: [] for i in nodes}
+    for a, b, _ in edges:
+        out[a].append(b)
+    state, back = {}, set()
+
+    def dfs(u):
+        state[u] = 1
+        for v in out[u]:
+            if state.get(v) == 1:
+                back.add((u, v))
+            elif v not in state:
+                dfs(v)
+        state[u] = 2
+    for i in nodes:
+        if i not in state:
+            dfs(i)
+    fwd = [(a, b) for a, b, _ in edges if (a, b) not in back]
+    layer = dict.fromkeys(nodes, 0)
+    for _ in nodes:
+        for a, b in fwd:
+            layer[b] = max(layer[b], layer[a] + 1)
+    rows = [[i for i in nodes if layer[i] == k] for k in range(max(layer.values()) + 1)]
+    pred = {i: [a for a, b in fwd if b == i] for i in nodes}
+    frac = {}
+    for r in rows:
+        r.sort(key=lambda i: sum(frac[a] for a in pred[i]) / len(pred[i]) if pred[i] else 0.5)
+        frac.update({i: (k + 0.5) / len(r) for k, i in enumerate(r)})
+    return rows
+
+
+def _mm_flow(s, lines, x, y, w, h):
+    """체인의 건너뛰기, 되돌아가기 선은 체인 옆 우회"""
+    horiz, nodes, edges = _mm_parse_flow(lines)
+    rows = _mm_layers(nodes, edges)
+    L, M = len(rows), max(map(len, rows))
+    lay = {i: k for k, r in enumerate(rows) for i in r}
+    nw, nh = _mm_size(nodes.values())
+    skips = [(a, b) for a, b, _ in edges if lay[b] - lay[a] != 1]
+    levels = _mm_levels([(min(lay[a], lay[b]), max(lay[a], lay[b])) for a, b in skips]) if M == 1 else []
+    far = MM_BYPASS0 + MM_BYPASS_STEP * max(levels) if levels else 0.0   # 가장 바깥 우회선 거리
+    if horiz:
+        cell = (h - nh) / (M - 1) if M > 1 else h   # 바깥 노드 가장자리가 영역 끝에 닿음
+        step_ = (w - nw) / (L - 1) if L > 1 else 0
+        if (M > 1 and cell < nh + 0.14) or (L > 1 and step_ - nw < 0.6) or nh + far > h:
+            raise ValueError(f"mermaid: flowchart 가 {w:.1f} x {h:.1f} in 에 안 들어감 (층 {L}, 한 층 최대 {M}개)")
+    else:
+        cell = (w - nw) / (M - 1) if M > 1 else w
+        step_ = (h - nh) / (L - 1) if L > 1 else 0
+        if (M > 1 and cell < nw + 0.2) or (L > 1 and step_ - nh < 0.35) or nw + far > w:
+            raise ValueError(f"mermaid: flowchart 가 {w:.1f} x {h:.1f} in 에 안 들어감 (층 {L}, 한 층 최대 {M}개)")
+    cx0, cy0 = x + (w - far) / 2, y + (h - far) / 2   # 우회선 폭만큼 체인을 밀어 가운데에
+    shapes = {}
+    for k, r in enumerate(rows):
+        for j, nid in enumerate(r):
+            off = (j - (len(r) - 1) / 2) * cell
+            if horiz:
+                lx, ty = (x + k * step_ if L > 1 else x + (w - nw) / 2), cy0 + off - nh / 2
+            else:
+                lx, ty = cx0 + off - nw / 2, (y + k * step_ if L > 1 else y + (h - nh) / 2)
+            shapes[nid] = _obst(s, box(s, lx, ty, nw, nh, nodes[nid], fill=WHITE, line=ACCENT, lw=1.0,
+                                       name=f"노드 {nid}"))
+    R, lv = _reg(s), iter(levels)
+    for a, b, lab in edges:
+        A, B = shapes[a], shapes[b]
+        if lay[b] - lay[a] == 1:
+            sa, sb = ("right", "left") if horiz else ("bottom", "top")
+            connect(s, A, sa, B, sb)
+            pts = _route(A, sa, B, sb, 0.5, check=False)
+        elif M == 1:   # 건너뛰거나 되돌아가는 선: 체인 옆으로 돌아감
+            sa = sb = "bottom" if horiz else "right"
+            off = MM_BYPASS0 + MM_BYPASS_STEP * next(lv)
+            connect(s, A, sa, B, sb, bypass=off)
+            pts = _bypass_pts(A, sa, B, sb, off)
+        else:
+            n0 = len(R.get("warn", []))
+            link(s, A, B, text=lab)
+            if len(R.get("warn", [])) > n0:
+                raise ValueError(f"mermaid: 선 {a} -> {b} 이 상자를 피해 그려지지 않음 (한 줄 체인이 아닌 그림의 "
+                                 "건너뛰거나 되돌아가는 선). 중간 노드를 거치게 고치거나 DocGrid 로")
+            continue
+        if lab:   # 선 이름은 저장 직전에 빈 자리로
+            R["pending"].append(("text", (pts, A, B), lab, None, SLATE9, None))
+    return shapes
+
+
+def _mm_seq(s, lines, x, y, w, h):
+    parts, msgs = {}, []
+    for ln in lines[1:]:
+        pm, mm = _MM_PART.match(ln), _MM_MSG.match(ln)
+        if pm:
+            parts.setdefault(pm.group(1), _mm_text(pm.group(2) or pm.group(1)))
+        elif mm:
+            a, arrow, b, t = mm.groups()
+            if a == b:
+                raise ValueError(f"mermaid: '{ln}' 자기 자신에게 보내는 메시지는 지원 밖")
+            parts.setdefault(a, a)
+            parts.setdefault(b, b)
+            msgs.append((a, b, _mm_text(t, " "), arrow == "-->>"))
+        else:
+            raise ValueError(f"mermaid: '{ln}' 지원 밖 문법 (participant, A->>B: 글, A-->>B: 글 만)")
+    if not msgs:
+        raise ValueError("mermaid: sequenceDiagram 에 메시지가 없음")
+    ids = list(parts)
+    cell = w / len(ids)
+    pw, nh = _mm_size(parts.values())
+    pw = max(1.0, pw)
+    pitch = (h - nh - 0.1) / len(msgs)
+    if pw > cell - 0.2 or pitch < 0.42:
+        raise ValueError(f"mermaid: sequenceDiagram 이 {w:.1f} x {h:.1f} in 에 안 들어감 "
+                         f"(참가자 {len(ids)}, 메시지 {len(msgs)})")
+    cx = {p: x + cell * (i + 0.5) for i, p in enumerate(ids)}
+    for p in ids:   # 세로 점선은 연결선이 아닌 선 도형
+        ln_ = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(cx[p]), Inches(y + nh), 0, Inches(h - nh))
+        ln_._element.spPr.find(qn("a:prstGeom")).set("prst", "line")
+        _no_style_effects(ln_)
+        _fill(ln_, None)
+        _line(ln_, GRAY, 0.75, "dash")
+        ln_.name = f"생명선 {p}"
+    shapes = {p: _obst(s, box(s, cx[p] - pw / 2, y, pw, nh, parts[p], fill=ACCENT, size=7.26, bold=True,
+                              color=WHITE, name=f"참가자 {p}")) for p in ids}
+    for k, (a, b, t, reply) in enumerate(msgs):
+        cy = y + nh + 0.1 + pitch * (k + 0.5)
+        if _text_w(t, 6.35) + 0.08 > abs(cx[a] - cx[b]) - 0.2:
+            raise ValueError(f"mermaid: 메시지 '{t}' 가 길어 참가자 간격 {abs(cx[a] - cx[b]):.2f} in 에 안 들어감")
+        bar = {p: _obst(s, box(s, cx[p] - 0.05, cy - 0.11, 0.1, 0.22, fill=ACCENT, name=f"활성 막대 {k + 1} {p}"))
+               for p in (a, b)}
+        right = cx[b] > cx[a]
+        connect(s, bar[a], "right" if right else "left", bar[b], "left" if right else "right",
+                color=GRAY if reply else ACCENT, dash="dash" if reply else None, text=t)
+    return shapes
+
+
+def mermaid(s, src, x, y, w, h):
+    """Mermaid 를 도형과 붙은 선으로 (flowchart, sequenceDiagram)
+    - 따옴표는 빼고 <br> 은 줄 바꿈. 지원 밖은 ValueError"""
+    lines = [ln.strip() for ln in src.strip().splitlines() if ln.strip() and not ln.strip().startswith("%%")]
+    if not lines:
+        raise ValueError("mermaid: 글이 비어 있음")
+    return (_mm_seq if lines[0] == "sequenceDiagram" else _mm_flow)(s, lines, x, y, w, h)
 
 
 # --- 덱
@@ -2519,9 +2876,14 @@ def save_profile_author(team, name, title):
 class Deck:
     """템플릿에 새 장 추가"""
 
-    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=(), allow=()):
+    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=(), allow=(), purpose=None, minutes=None):
         """parts_only: 본문만. forbid: 덱에 나가면 안 되는 정규식
-        - allow: 검사에서 뺄 정규식 (화면 문구 그대로 옮긴 글 등)"""
+        - allow: 검사에서 뺄 정규식 (화면 문구 그대로 옮긴 글 등)
+        - purpose: 쓰임새 (PURPOSES 중 하나). minutes: 발표 분"""
+        if purpose is not None and purpose not in PURPOSES:
+            raise ValueError(f"purpose '{purpose}' 는 {PURPOSES} 중 하나")
+        if minutes is not None and not (isinstance(minutes, (int, float)) and minutes > 0):
+            raise ValueError(f"minutes '{minutes}' 는 0 보다 큰 수")
         self.parts_only = parts_only
         self.forbid = [re.compile(p) for p in forbid]
         self.allow = list(allow)
@@ -2535,6 +2897,10 @@ class Deck:
         self.prs = Presentation(template)
         self.prs.core_properties.author = self.author
         self.prs.core_properties.last_modified_by = self.author
+        if purpose:   # 검사 도구가 읽음
+            self.prs.core_properties.category = "ix-purpose:" + purpose
+        if minutes:
+            self.prs.core_properties.content_status = f"ix-minutes:{minutes:g}"
         if self.allow:   # 검사 도구가 읽음
             self.prs.core_properties.keywords = "ix-allow:" + __import__("json").dumps(self.allow, ensure_ascii=False)
         self._lib = list(self.prs.slides._sldIdLst)
@@ -2618,8 +2984,8 @@ class Deck:
     def _end(self):
         return self._add("앤드페이지_다크네이비")
 
-    def report_slide(self, title, subtitle, lead=None):
-        """보고형 머리 띠와 요약 한 줄"""
+    def report_slide(self, title, subtitle, lead=None, notes=None):
+        """보고형 머리 띠와 요약 한 줄. notes: 발표자 노트"""
         s = self._add("본문_소제목 O", keep=(10, 11))
         for idx, t in ((10, title), (11, subtitle)):
             ph = s.placeholders[idx]
@@ -2633,6 +2999,8 @@ class Deck:
             ph.width = Inches(8.6 if idx == 10 else 11.8) - l_
         if lead:
             summary(s, lead)
+        if notes:
+            s.notes_slide.notes_text_frame.text = notes
         return s
 
     def section(self, name):
@@ -2642,22 +3010,60 @@ class Deck:
         self._page = 0
         getattr(self, "_toc_items", []).append((name, []))
 
-    def page(self, subtitle, lead=None, doc=False):
-        """다음 장. doc=True 면 구성도 장"""
+    def criteria(self, items):
+        """평가항목 목록. 저장 때 대응표 장이 Thank you 앞에 붙음"""
+        items = [str(i).strip() for i in items]
+        if not items or "" in items or len(set(items)) != len(items):
+            raise ValueError("criteria: 항목은 하나 이상, 빈 글과 중복 없이")
+        if len(items) > 14:
+            raise ValueError("criteria: 항목은 14개까지 (대응표가 한 장)")
+        self._criteria, self._covers = items, {}
+
+    def deliverables(self, stages):
+        """{단계: [산출물]}. 저장 때 gantt 작업 이름과 대조. 표 행 반환"""
+        if not stages or any(not v for v in stages.values()):
+            raise ValueError("deliverables: 단계마다 산출물이 하나 이상")
+        self._deliv = dict(stages)
+        return [["단계", "산출물"]] + [[k, ", ".join(v)] for k, v in stages.items()]
+
+    def _crit_slide(self):
+        """Thank you 앞 평가항목 대응표 장. 답 없는 항목은 저장 실패"""
+        if not getattr(self, "_criteria", None):
+            return
+        cv = self._covers
+        self._crit_problems = [f"평가항목 '{c}' 에 답한 장이 없음 (d.page(covers=[...]))" for c in self._criteria
+                               if c not in cv]
+        self.section("평가항목 대응")
+        s = self.page("평가항목 대응표", lead=f"평가항목 {len(self._criteria)}개와 답한 쪽 번호")
+        w, n = REPORT_RIGHT - REPORT_LEFT, len(self._criteria)
+        panel(s, REPORT_LEFT, REPORT_TOP, w, REPORT_BOTTOM - REPORT_TOP, "평가항목별 답한 장")
+        rh = min(0.55, max(0.3, (BODY_BOTTOM - BODY_TOP - 0.27) / n))
+        rows = [["평가항목", "답한 장"]] + [[c, ", ".join(cv.get(c, ["없음"]))] for c in self._criteria]
+        table(s, REPORT_LEFT + PAD, BODY_TOP, [(w - 2 * PAD) * 0.65, (w - 2 * PAD) * 0.35], rows, size=10.5, row_h=rh)
+        notes(s, REPORT_LEFT + PAD, BODY_TOP + 0.27 + rh * n + 0.1, w - 2 * PAD, ["출처: 본문 장 꼬리말 쪽 번호"])
+
+    def page(self, subtitle, lead=None, doc=False, notes=None, covers=None):
+        """다음 장. doc: 구성도 장, notes: 노트, covers: 평가항목"""
         if not getattr(self, "_sec", 0):
             raise ValueError("page: 먼저 d.section('절 이름')")
         if getattr(self, "_closed", False):
             raise ValueError("저장한 뒤 장을 더하지 않는다 (목차와 Thank you 가 이미 들어감): build.py 를 처음부터 다시 돌린다")
+        for c in covers or ():
+            if c not in getattr(self, "_criteria", ()):
+                raise ValueError(f"covers '{c}' 이 d.criteria([...]) 에 없음")
         self._page += 1
         if getattr(self, "_toc_items", None):
             self._toc_items[-1][1].append(subtitle.split(" (")[0])
         title = f"{self._sec}. {self._sec_name}"
         sub = f"{self._sec}-{self._page}. {subtitle}"
-        return (self.doc_slide if doc else self.report_slide)(title, sub, lead=lead)
+        s = (self.doc_slide if doc else self.report_slide)(title, sub, lead=lead, notes=notes)
+        for c in covers or ():   # 꼬리말 쪽 번호
+            self._covers.setdefault(c, []).append(f"{len(self.prs.slides) - len(self._lib)}쪽")
+        return s
 
-    def doc_slide(self, title, subtitle, lead=None):
+    def doc_slide(self, title, subtitle, lead=None, notes=None):
         """설계문서형 장 (넓은 도식 자리)"""
-        s = self.report_slide(title, subtitle, lead=lead)
+        s = self.report_slide(title, subtitle, lead=lead, notes=notes)
         _reg(s)["doc_top"] = REPORT_TOP if lead else 1.45
         return s
 
@@ -2743,6 +3149,7 @@ class Deck:
         if not hasattr(self, "_toc") and not self.parts_only:
             raise ValueError("표지가 없음: d.cover(제목, 날짜) 로 시작 (표지 뒤 목차가 따라 붙음)")
         if not getattr(self, "_closed", False) and not self.parts_only:
+            self._crit_slide()
             self._fill_toc()
             self._end()
             self._closed = True
@@ -2750,7 +3157,15 @@ class Deck:
         problems = []
         body = [sl for sl in list(self.prs.slides)[lib_n:] if sl.slide_layout.name == "본문_소제목 O"]
         kpi_slides = [i for i, sl in enumerate(body, 1) if _reg(sl).get("kpi_items", 0)]
+        problems.extend(getattr(self, "_crit_problems", []))
+        names = {n for sl in body for n in _reg(sl).get("gantt_names", [])}
+        if getattr(self, "_deliv", None):   # 일정 작업과 산출물 단계 이름이 서로 있어야 함
+            problems += [f"산출물 단계 '{k}' 이 일정(gantt) 작업 이름에 없음" for k in self._deliv if k not in names]
+            problems += [f"일정 작업 '{k}' 의 산출물이 없음 (d.deliverables)" for k in sorted(names - set(self._deliv))]
         for i, sl in enumerate(body, 1):
+            if _reg(sl).get("kpi_table") and not any(SRC_LINE.search(ln.strip()) for t_ in slide_texts(sl)
+                                                    for ln in t_.split(chr(10))):
+                problems.append(f"본문 {i}장: KPI 표 아래 '※ 출처: 자료 이름 (날짜)' 메모가 없음")
             if _reg(sl).get("kpi_rows", 0) > 1 or _reg(sl).get("kpi_items", 0) > 4:
                 problems.append(f"본문 {i}장: 핵심 수치 줄 {_reg(sl).get('kpi_rows', 0)}개, 수치 {_reg(sl).get('kpi_items', 0)}개 "
                                 "(한 장에 한 줄, 4개까지)")
@@ -2767,6 +3182,11 @@ class Deck:
         for i, sl in enumerate(self.prs.slides, 1):
             _flush(sl)
             if i > lib_n:
+                sub = re.sub(r"^\d+-\d+\.\s*|\s*\(.*\)$", "", next(
+                    (q.text_frame.text for q in sl.placeholders if q.placeholder_format.idx == 11), ""))
+                for t in sorted(_reg(sl).get("panel_titles", ())):   # 출력만 (저장은 멈추지 않음)
+                    if sub and re.sub(r"\s*\(.*\)$", "", t) == sub:
+                        print(f"주의 {i - lib_n}장: 패널 머리 '{t}' 가 소제목과 같은 말: 패널 머리를 내용 이름으로")
                 for m in dict.fromkeys(layout_problems(sl)):
                     print(f"주의 {i - lib_n}장: {m}")
                     problems.append(f"{i - lib_n}장: {m}")

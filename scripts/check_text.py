@@ -1,5 +1,6 @@
 """문장 검사: AI 투 표현, 서술체, 읽기 어려운 문장
 사용: check_text.py 덱.pptx (종료 코드 = 실패 건수, 주의는 출력만)"""
+import json
 import os
 import re
 import sys
@@ -7,7 +8,10 @@ import sys
 from pptx import Presentation
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from check_ban import allowed, slide_texts  # noqa: E402
+from check_ban import allowed, notes_of, slide_texts  # noqa: E402
+
+LEXICON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "third_party", "im-not-ai",
+                       "lexicon.json")
 
 # 실패: 보고서에 쓰지 않는 AI 투 수식어, 감탄, 서술체
 FAIL = [
@@ -16,6 +20,7 @@ FAIL = [
     (r"[가-힣]니다|(한다|된다|이다|했다|하였다)(\.|$)", "서술체: 개조식 명사형 (~함, ~임, 명사)"),
     (r"[가-힣)]\s*!|[\U0001F300-\U0001FAFF]", "느낌표, 그림 문자"),
 ]
+NOTE_FAIL = FAIL[:1] + FAIL[2:]   # 노트는 말투라 서술체 제외
 # 주의: 사람이 읽고 판단
 WARN = [
     (r"최적의|완벽하|강력한|한눈에", "꾸밈말: 수치나 사실로 바꿀 수 있는지"),
@@ -42,13 +47,63 @@ def noun_chain(t):
     return None
 
 
+def lexicon_entry(e):
+    """바꿀 항목이면 튜플, 필드 빠짐이나 정규식 오류면 None"""
+    try:
+        if e.get("tier") != "change" or not e.get("regex"):
+            return None
+        why = e["change_when"]["보고서"]
+        return (e["id"], e["headword"], re.compile(e["regex"]),
+                re.compile(e["regex_exclude"]) if e.get("regex_exclude") else None, why)
+    except (KeyError, TypeError, AttributeError, re.error):
+        return None
+
+
+def load_lexicon():
+    """im-not-ai 어휘 중 바꿀 항목 (필드가 빠진 항목은 건너뜀)"""
+    return [x for x in map(lexicon_entry, json.load(open(LEXICON, encoding="utf8"))["entries"]) if x]
+
+
+# 날짜 표기 5종 (YYYY.MM.DD 가 기준 꼴)
+DATE_KINDS = {"YYYY.MM.DD": re.compile(r"(?<![\d.])(?:19|20)\d{2}\.\d{1,2}\.\d{1,2}(?![\d])"),
+              "YYYY-MM-DD": re.compile(r"(?<![\d-])(?:19|20)\d{2}-\d{1,2}-\d{1,2}(?![\d])"),
+              "M/D": re.compile(r"(?<![\d/.])(?:1[0-2]|0?[1-9])/(?:3[01]|[12]\d|0?[1-9])(?![\d/])"),
+              "M월 D일": re.compile(r"\d{1,2}월\s?\d{1,2}일"),
+              "YYYY.MM": re.compile(r"(?<![\d.])(?:19|20)\d{2}\.(?:0?[1-9]|1[0-2])(?!\.?\d)")}
+
+
+def date_kinds(lines):
+    """글에 나온 날짜 표기 종류 (이름: 첫 예)"""
+    out = {}
+    for ln in lines:
+        for k, rx in DATE_KINDS.items():
+            m = rx.search(ln)
+            if m and k not in out:
+                out[k] = m.group()
+    return out
+
+
+def lexicon_hits(where, ln, lex, seen):
+    """한 줄에서 맞은 어휘 (장마다 항목 하나는 한 번만)"""
+    for id_, head, rx, ex, why in lex:
+        if (where, id_) not in seen and rx.search(ln) and not (ex and ex.search(ln)):
+            seen.add((where, id_))
+            yield f"{where} 어휘 {id_} {head}: {why} | {ln[:40]}"
+
+
 def check(path):
     fails, warns = [], []
     prs = Presentation(path)
     ok = allowed(prs)
+    long_ln = 110 if (prs.core_properties.category or "") == "ix-purpose:문서" else 70   # 문서 덱은 긴 줄 허용
+    lex, seen = (load_lexicon(), set()) if os.path.exists(LEXICON) else ([], set())
+    if not lex:
+        warns.append(f"어휘 사전을 못 읽음: {LEXICON}")
+    all_lines = []
     for i, s in enumerate(prs.slides, 1):
         lines = [ln.strip(" •※-") for t in slide_texts(s) for ln in (ok(t) if ok else t).split("\n")
                  if ln.strip()]
+        all_lines += lines
         for ln in lines:
             for pat, why in FAIL:
                 m = re.search(pat, ln)
@@ -58,15 +113,28 @@ def check(path):
                 m = re.search(pat, ln)
                 if m:
                     warns.append(f"{i}쪽 '{m.group()}' ({why}): {ln[:60]}")
+            warns.extend(lexicon_hits(f"{i}쪽", ln, lex, seen))
             c = noun_chain(ln) if len(ln.split()) >= 4 else None   # 상자 이름은 뺌
             if c:
                 warns.append(f"{i}쪽 명사 잇기 '{c}': 조사를 넣어 풀어 씀")
-            if len(ln) > 70:
+            if len(ln) > long_ln:
                 warns.append(f"{i}쪽 {len(ln)}자 문장: 두 줄로 나누거나 줄임: {ln[:40]}...")
+        note = notes_of(s)
+        for ln in (x.strip(" •※-") for x in (ok(note) if ok else note).split("\n") if x.strip()):
+            for pats, out in ((NOTE_FAIL, fails), (WARN, warns)):
+                for pat, why in pats:
+                    m = re.search(pat, ln)
+                    if m:
+                        out.append(f"{i}쪽 노트 '{m.group()}' ({why}): {ln[:60]}")
+            warns.extend(lexicon_hits(f"{i}쪽 노트", ln, lex, seen))
         heads = [re.match(r"\S+", ln).group() for ln in lines if len(ln) > 8]
         for h in set(heads):
             if heads.count(h) >= 3 and re.fullmatch(r"[가-힣]+", h):
                 warns.append(f"{i}쪽 '{h}' 로 시작하는 줄 {heads.count(h)}개: 같은 틀 되풀이")
+    kinds = date_kinds(all_lines)
+    if len(kinds) > 2:
+        warns.append(f"날짜 표기 {len(kinds)}종 혼용 ({', '.join(f'{k} {v}' for k, v in kinds.items())}): "
+                     "YYYY.MM.DD 하나로")
     return fails, warns
 
 

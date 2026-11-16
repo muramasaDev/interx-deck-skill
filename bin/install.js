@@ -12,7 +12,7 @@ const PKG = require(path.join(SRC, "package.json"));
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 const DEST = path.join(CLAUDE, "skills", "interx-deck");
 const MARK = ".installed-by-npm";
-const ITEMS = [".claude-plugin", "hooks", "skills", "scripts", "assets", "README.md", "CHANGELOG.md"];
+const ITEMS = [".claude-plugin", "hooks", "skills", "scripts", "assets", "third_party", "README.md", "CHANGELOG.md"];
 
 const COLOR = (process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
 const paint = (code) => (s) => (COLOR ? `\x1b[${code}m${s}\x1b[0m` : s);

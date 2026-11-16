@@ -1,6 +1,6 @@
 # 장마다 PNG, -Pdf 면 PDF 추가
 # DRM 때문에 사본만 열기
-# 사용: -Pptx 파일 -Out 폴더 [-Slides 1,3] [-Pdf 파일]
+# 사용: -Pptx 파일 -Out 폴더 [-Slides 1,3 또는 none] [-Pdf 파일]
 param([Parameter(Mandatory)][string]$Pptx, [Parameter(Mandatory)][string]$Out, [string]$Slides, [string]$Pdf)
 $ErrorActionPreference = 'Stop'
 $src = (Resolve-Path $Pptx).Path
@@ -14,7 +14,7 @@ $pp = New-Object -ComObject PowerPoint.Application
 try {
     $p = $pp.Presentations.Open($tmp, $true, $false, $false)
     $n = $p.Slides.Count
-    $list = if ($Slides) { $Slides -split ',' | ForEach-Object { [int]$_ } } else { 1..$n }
+    $list = if ($Slides -eq 'none') { @() } elseif ($Slides) { $Slides -split ',' | ForEach-Object { [int]$_ } } else { 1..$n }
     foreach ($i in $list) { $p.Slides($i).Export((Join-Path $Out "s$i.png"), "PNG", 1600, 900) }
     if ($Pdf) {
         $p.SaveAs($tmpPdf, 32)   # 32 = ppSaveAsPDF

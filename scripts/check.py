@@ -8,6 +8,9 @@ from lxml import etree
 
 import math
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from check_ban import SRC_LINE, slide_texts  # noqa: E402
+
 sys.stdout.reconfigure(errors="replace")  # cp949 콘솔에서 멈추지 않게
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -49,6 +52,14 @@ def lines_needed(tf, width, default):
             n += k
             top += k * sz * 1.2 * ls / 72
     return n, top
+
+
+def _rect(sh):
+    """도형 바깥 상자 (인치). 90도 돌린 선은 폭과 높이를 바꿈"""
+    l, t, w, h = (v / 914400 for v in (sh.left, sh.top, sh.width, sh.height))
+    if round(getattr(sh, "rotation", 0) or 0) % 180 == 90:
+        l, t, w, h = l + (w - h) / 2, t + (h - w) / 2, h, w
+    return l, t, l + w, t + h
 
 
 def widow(txt, size, width, k=1.0):
@@ -122,7 +133,8 @@ from pptx import Presentation  # noqa: E402
 
 E = 914400
 sections = {}
-_all = list(Presentation(path).slides)
+_prs = Presentation(path)
+_all = list(_prs.slides)
 _names = [sl.slide_layout.name for sl in _all]
 if len(_all) < 3 or _names[0] != "3_사용자 지정 레이아웃" or _names[1] != "5_contents-02" or _names[-1] != "앤드페이지_다크네이비":
     bad.append(f"장 순서: 표지, 목차, 본문, Thank you 여야 함 (지금 {_names[:2]} ... {_names[-1:]})")
@@ -137,9 +149,9 @@ for i, sl in enumerate(_all, 1):
     for sh in list(sl.shapes) + list(sl.slide_layout.shapes):  # 16:9 틀 안
         if sh.width is None:
             continue
-        if sh.left < -E * 0.005 or sh.top < -E * 0.005 or sh.left + sh.width > cx + E * 0.005 or sh.top + sh.height > cy + E * 0.005:
-            bad.append(f"slide{i}: 도형 '{sh.name}' 이 장 밖으로 나감 ({sh.left / E:.2f}, {sh.top / E:.2f}, "
-                       f"{(sh.left + sh.width) / E:.2f}, {(sh.top + sh.height) / E:.2f} in)")
+        l_, t_, r_, b_ = _rect(sh)   # 90도 돌린 선(우회선 등)은 돌린 채로
+        if l_ < -0.005 or t_ < -0.005 or r_ > cx / E + 0.005 or b_ > cy / E + 0.005:
+            bad.append(f"slide{i}: 도형 '{sh.name}' 이 장 밖으로 나감 ({l_:.2f}, {t_:.2f}, {r_:.2f}, {b_:.2f} in)")
     if sl.slide_layout.name in ("3_사용자 지정 레이아웃", "5_contents-02", "앤드페이지_다크네이비"):  # 표지, 목차, 끝 장
         continue
     for sh in sl.shapes:  # 번호 원 지름
@@ -210,7 +222,7 @@ for i, sl in enumerate(_all, 1):
         bad.append(f"slide{i}: 요약 줄이 한 줄을 넘음 (어림 {tw(lead[0], 12):.1f} in, 칸 12.17 in)")
     if sl.slide_layout.name != "본문_소제목 O":
         bad.append(f"slide{i}: 레이아웃 '{sl.slide_layout.name}' (본문은 모두 '본문_소제목 O')")
-    bx = [(sh.left / E, sh.top / E, (sh.left + sh.width) / E, (sh.top + sh.height) / E) for sh in sl.shapes
+    bx = [_rect(sh) for sh in sl.shapes
           if not sh.is_placeholder and sh.width is not None and sh.width / E < 13.0 and sh.height / E < 6.5]
     if not bx:
         continue
@@ -219,7 +231,11 @@ for i, sl in enumerate(_all, 1):
     note = print if SOFT else bad.append
     if abs(c - 6.67) > 0.35:
         note(f"slide{i}: 내용 중심 {c:.2f} (장 가운데 6.67), 왼 여백 {L:.2f}, 오른 여백 {13.33 - R:.2f}")
-    if 7.5 - B > 0.95:
+    if any(s.has_text_frame and not s.is_placeholder and "252E3F" in s._element.xml and s.height / E < 0.32
+           for s in sl.shapes):   # 패널 장은 내용에 맞춰 줄어듦: 패널 높이가 본문의 45% 미만일 때만 주의
+        if B - 1.86 < 0.45 * (FOOTER_Y - 0.3 - 1.86):
+            print(f"주의: slide{i} 내용 높이 {B - 1.86:.2f} in 가 본문 높이의 45% 미만 (내용이 너무 적은 장)")
+    elif 7.5 - B > 0.95:
         note(f"slide{i}: 아래 여백 {7.5 - B:.2f} in (도식을 아래로 늘리거나 블록을 더함)")
     if B > FOOTER_Y - 0.25:   # 꼬리말 선 위 0.3 in 비움
         bad.append(f"slide{i}: 내용 아래 {B:.2f} in 가 바닥 선({FOOTER_Y}) 위 0.3 in 여백을 침범")
@@ -263,7 +279,40 @@ def shape_of(sl):
 main = [sl for sl in body if not any(ph.placeholder_format.idx == 10 and ph.has_text_frame and
                                        re.search(r"Appendix|부록", ph.text_frame.text) for ph in sl.placeholders)]
 tables = sum(1 for sl in main if any(s.has_table for s in sl.shapes))   # 부록 장은 셈에서 뺌
-if len(main) >= 4 and tables > len(main) * 0.5:
+def _numeric(sh):
+    """차트, 또는 숫자 칸이 둘 이상인 표"""
+    if sh.has_chart:
+        return True
+    if not sh.has_table:
+        return False
+    cells = [c.text for r in sh.table.rows for c in r.cells]
+    num = re.compile(r"^[^\d가-힣]*\d[\d\s.,%~+\-:/() ]*(\s*[가-힣a-zA-Z%°µ]{1,3})?$")   # 숫자와 짧은 단위
+    return sum(1 for t in cells if num.match(t.strip())) >= 2
+
+
+for sl in main:   # 숫자 장(차트, 숫자 표)은 출처 줄이 있어야 함
+    if any(_numeric(s) for s in sl.shapes) and not any(
+            SRC_LINE.search(ln.strip()) for t in slide_texts(sl) for ln in t.split("\n")):
+        bad.append(f"slide{_all.index(sl) + 1}: 차트나 표가 있는 장에 출처 줄이 없음 ('※ 출처: 자료 이름 (날짜)' 한 줄, '기준:' 은 출처가 아님)")
+_purpose = (re.match(r"ix-purpose:(.+)", _prs.core_properties.category or "") or [None, None])[1]
+if _purpose in ("사내보고", "제안") and body:
+    _sub = next((q.text_frame.text for q in body[0].placeholders if q.placeholder_format.idx == 11), "")
+    if "요약" not in _sub:
+        bad.append(f"slide{_all.index(body[0]) + 1}: 쓰임새 '{_purpose}' 덱의 첫 본문 장 소제목 '{_sub}' 에 '요약' 이 없음")
+if _purpose == "영업":   # 첫 본문 장은 회사 소개가 아니라 변화 이야기
+    _intro = [sl for sl in body if re.search(r"회사\s?소개", next((q.text_frame.text for q in sl.placeholders
+                                                                if q.placeholder_format.idx == 11), ""))]
+    if body and body[0] in _intro:
+        bad.append(f"slide{_all.index(body[0]) + 1}: 영업 덱의 첫 본문 장이 회사 소개 (변화 이야기로 시작)")
+    if len(_intro) > 1:
+        bad.append(f"영업 덱에 회사 소개 장 {len(_intro)}장 (1장 이하)")
+    if not 6 <= len(main) <= 15:
+        print(f"주의: 영업 덱 본문 {len(main)}장 (6 ~ 15장 권장)")
+_min = re.match(r"ix-minutes:([\d.]+)", _prs.core_properties.content_status or "")
+if _min and len(main) > float(_min.group(1)) / 1.5:
+    print(f"주의: 본문 {len(main)}장이 발표 {_min.group(1)}분 기준 {float(_min.group(1)) / 1.5:.0f}장(1.5분당 1장)을 넘음")
+_doc = _purpose == "문서"   # 문서 배포 덱은 표 비율 한도가 높음
+if len(main) >= 4 and tables > len(main) * (0.7 if _doc else 0.5):
     bad.append(f"표가 있는 본문 장 {tables}/{len(main)} (절반 넘음). 명세 표는 부록으로, 본문은 그림과 글로")
 elif len(main) >= 4 and tables > len(main) * 0.35:
     print(f"주의: 표가 있는 본문 장 {tables}/{len(main)} (35% 넘음). 규칙과 이유는 글, 관계는 그림으로")
