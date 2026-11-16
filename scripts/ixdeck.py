@@ -87,6 +87,14 @@ LIMITS = {"num_cards 제목": 16, "num_cards 설명": 40, "tab_box 줄": 46, "kp
 KPI_HEAD = ["지표", "기존 수치", "목표 수치", "계산식", "근거"]
 COLLECT_HEAD = ["공정", "데이터", "집계 방법"]
 COLLECT_METHODS = ("자동", "반자동", "수동")
+# 회사 방법론 (skills/design/references/A1_방법론.md)
+DAS_HEAD = ["구분", "Data", "Data Type", "Range", "Acq. Time", "Unit", "Stage", "Connected"]
+DAS_KIND = re.compile(r"^(X[1-5]|Y\d*|Yn)$")
+QUALITY_W = {"완전성 (누락)": 60, "유일성 (중복)": 10, "유효성 (유효)": 10, "일관성 (표현)": 10, "정확성 (실제)": 10}
+QUALITY_TARGET = 95.0   # 제조 데이터 품질 95% 이상 필수
+PRIORITY_W = ((0.4, 0.3, 0.3), (0.4, 0.4, 0.2))   # 전략적 중요도, 실행의 용이성
+PRIORITY_HEAD = ["과제", "기여도", "효과 크기", "시급성", "중요도", "투자", "효과 발생", "관리", "용이성", "총점", "구분"]
+LEVELS = ["L1 ~ 2 모니터링", "L3 제어", "L4 최적화", "L5 자율운영"]   # L: Level
 
 
 def normalize_fonts(path):
@@ -1346,6 +1354,7 @@ def _text_w(t, size):
 
 
 _NOT_END = ("e.g.", "i.e.", "vs.", "etc.", "No.", "Inc.", "Co.", "Ltd.", "Fig.", "p.")
+_ABBR_END = re.compile(r"(^|[\s\[(])([A-Za-z]{1,4}|\d+)\.$")   # 'Acq.', '[표 1.' 같은 약어와 번호 뒤 점
 
 
 def ko_breaks(text, width, size):
@@ -1355,7 +1364,7 @@ def ko_breaks(text, width, size):
     parts = re.split(r"(?<=[.!?])(?<!\.\.)(?<![.][.][.])\s+(?=\S)", text)
     sents = []
     for p_ in parts:   # 약어로 끝난 조각은 다음과 붙임
-        if sents and sents[-1].endswith(_NOT_END):
+        if sents and (sents[-1].endswith(_NOT_END) or _ABBR_END.search(sents[-1])):
             sents[-1] += " " + p_
         else:
             sents.append(p_)
@@ -1678,6 +1687,78 @@ class Col:
             if len(r) == 3 and r[2] not in COLLECT_METHODS:
                 raise ValueError(f"집계 방법 '{r[2]}' 은 {COLLECT_METHODS} 중 하나")
         return self._fixed_table([first, *COLLECT_HEAD[1:]], rows, [1, 2.4, 1], row_h, title=title, unit=unit)
+
+    def das_table(self, rows, title=None, row_h=0.28):
+        """데이터 수집 명세서 (DAS) 표. rows=[(구분 X1 ~ X5 또는 Yn, Data, Data Type, Range, Acq. Time, Unit, Stage, Connected)]"""
+        for r in rows:
+            if len(r) and not DAS_KIND.match(str(r[0]).strip()):
+                raise ValueError(f"DAS 구분 '{r[0]}' 은 X1 ~ X5 (작업, 환경, 셋팅, 실행1, 실행2) 또는 Yn (결과)")
+        return self._fixed_table(DAS_HEAD, rows, [0.55, 1.55, 0.85, 0.9, 0.95, 0.6, 0.75, 1.2], row_h,
+                                 title=title or "데이터 수집 명세서 (DAS)")
+
+    def quality_table(self, values, title=None, row_h=0.28):
+        """수집 데이터 품질 지수 표. values={완전성: %, 유일성: %, 유효성: %, 일관성: %, 정확성: %} (키는 앞 글자만 맞으면 됨)"""
+        got = {}
+        for k in QUALITY_W:
+            hit = [v for kk, v in values.items() if k.startswith(str(kk).split()[0])]
+            if len(hit) != 1:
+                raise ValueError(f"quality_table: '{k.split()[0]}' 값이 없음 (완전성, 유일성, 유효성, 일관성, 정확성 다섯)")
+            if not 0 <= float(hit[0]) <= 100:
+                raise ValueError(f"quality_table: '{k.split()[0]}' {hit[0]} 은 0 ~ 100 (%)")
+            got[k] = float(hit[0])
+        idx = sum(v * QUALITY_W[k] / 100 for k, v in got.items())
+        ok = "충족" if idx >= QUALITY_TARGET else "미달"
+        rows = [["구분", "품질지수", "가중치", "가중치지수", "오류율"]]
+        rows += [[k, f"{v:.2f}", f"{QUALITY_W[k]}", f"{v * QUALITY_W[k] / 100:.2f}", f"{100 - v:.2f}"]
+                 for k, v in got.items()]
+        rows.append([f"품질 지수 ({ok}, 기준 {QUALITY_TARGET:g} 이상)", "", "100", f"{idx:.2f}", f"{100 - idx:.2f}"])
+        return self.table(rows, ratio=[2.2, 1, 1, 1, 1], row_h=row_h, title=title or "수집 데이터 품질 지수", unit="%",
+                          highlight=(len(rows) - 2,))
+
+    @staticmethod
+    def _priority(rows, cut):
+        out = []
+        for r in rows:
+            if len(r) != 7 or any(not isinstance(v, (int, float)) or not 1 <= v <= 5 for v in r[1:]):
+                raise ValueError(f"우선순위 행은 (과제, 기여도, 효과, 시급성, 투자, 효과발생, 관리), 점수 1 ~ 5: {r}")
+            a = sum(w * v for w, v in zip(PRIORITY_W[0], r[1:4]))
+            b = sum(w * v for w, v in zip(PRIORITY_W[1], r[4:7]))
+            q = ("QW" if b >= cut else "SI") if a >= cut else ("NH" if b >= cut else "LN")
+            out.append((r[0], r[1:4], round(a, 1), r[4:7], round(b, 1), q))
+        return out
+
+    def priority_table(self, rows, title=None, cut=3.5, row_h=0.28):
+        """과제 우선순위 평가표 (중요도 50%, 용이성 50%). cut: 4분면 기준 점수"""
+        rs = [[n, *map(str, s1), f"{a:.1f}", *map(str, s2), f"{b:.1f}", f"{a + b:.1f}", q]
+              for n, s1, a, s2, b, q in self._priority(rows, cut)]
+        return self.table([PRIORITY_HEAD, *rs], ratio=[2.2, 0.8, 0.8, 0.7, 0.7, 0.8, 0.8, 0.8, 0.7, 0.7, 0.6],
+                          row_h=row_h, title=title or "과제 우선순위 평가", unit="점")
+
+    def priority_quad(self, rows, title=None, cut=3.5, h=2.4):
+        """과제 우선순위 4분면 (세로 전략적 중요도, 가로 실행의 용이성). 칸마다 과제 이름"""
+        ps = self._priority(rows, cut)
+        names = {q: [n for n, *_, qq in ps if qq == q] for q in ("SI", "QW", "LN", "NH")}
+        heads = {"SI": "Strategic Initiatives (중장기)", "QW": "Quick Win (단기 실행)", "LN": "Leave for Now (배제)",
+                 "NH": "Nice to Have (선택)"}
+
+        def draw(y, r):
+            label(self.s, self.x, y, self.w, f"세로 전략적 중요도, 가로 실행의 용이성 (기준 {cut:g}점)", align="l")
+            gy, gw, gh = y + 0.2, (self.w - 0.06) / 2, (h - 0.2 - 0.06) / 2
+            for k, q in enumerate(("SI", "QW", "LN", "NH")):
+                bx, by = self.x + (k % 2) * (gw + 0.06), gy + (k // 2) * (gh + 0.06)
+                _obst(self.s, box(self.s, bx, by, gw, gh, fill=SLATE0, line=GRAY_L, lw=0.75))
+                box(self.s, bx, by, gw, 0.24, heads[q], fill=ACCENT if q == "QW" else SLATE6, size=7.26, bold=True,
+                    color=WHITE)
+                text(self.s, bx + 0.1, by + 0.3, gw - 0.2, gh - 0.36, "\n".join(names[q]) or "없음", size=7.26,
+                     color=SLATE9 if names[q] else GRAY, anchor="t")
+            figure_caption(self.s, title or "과제 우선순위 4분면", self.x, y + h + 0.02, self.w, key=self._ck(y))
+        return self._add(h + CAP_H, draw)
+
+    def levels(self, current, h=0.32):
+        """수준 단계 띠 (Level 1 ~ 2 모니터링, 3 제어, 4 최적화, 5 자율운영). current: 0 ~ 3"""
+        if not 0 <= current < len(LEVELS):
+            raise ValueError(f"levels current 는 0 ~ {len(LEVELS) - 1} ({', '.join(LEVELS)})")
+        return self.chevrons(LEVELS, current=current, h=h)
 
     def chart(self, kind, categories, series, h=1.9, title=None, **kw):
         """차트 블록. title: 아래 가운데 [그림 #. 제목]"""

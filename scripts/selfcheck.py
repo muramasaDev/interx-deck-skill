@@ -950,6 +950,23 @@ table_caption(_ds, 1.0, 1.8, 6.0, "일정", rows=[["순번", "날짜", "판"], [
 assert len(_reg(_ds).get("warn", [])) == _ws, _reg(_ds)["warn"][_ws:]
 table_caption(_ds, 1.0, 1.8, 6.0, "수량", rows=[["항목", "값"], ["가", "12"], ["나", "3.5"]])
 assert "단위 없음" in _reg(_ds)["warn"][-1], _reg(_ds)["warn"][-1]
+# 방법론 부품: DAS 구분, 품질 지수 (원본 예시 98.43), 우선순위 4분면, 수준 단계
+for _bad in (lambda: Col(_ds, 1, 11).das_table([("X9", "가", "Float", "-", "-", "-", "-", "PLC")]),
+             lambda: Col(_ds, 1, 11).quality_table({"완전성": 97}),
+             lambda: Col(_ds, 1, 11).priority_table([("가", 6, 1, 1, 1, 1, 1)]),
+             lambda: Col(_ds, 1, 11).levels(4)):
+    try:
+        _bad()
+        raise AssertionError("방법론 부품 잘못된 입력이 통과함")
+    except ValueError:
+        pass
+_qc = Col(_ds, 1, 11, top=2.0, bottom=6.5).quality_table({"완전성": 97.38, "유일성": 100, "유효성": 100, "일관성": 100,
+                                                           "정확성": 100}, title="품질")
+_qc.done()
+assert any("98.43" in c.text for sh in _ds.shapes if sh.has_table for r in sh.table.rows for c in r.cells)
+_pr = Col._priority([("OEE", 4, 4, 5, 4, 4, 4), ("설비", 5, 4, 3, 2, 3, 2), ("품질", 3, 3, 2, 3, 3, 3),
+                     ("검사", 3, 3, 3, 4, 4, 4)], 3.5)
+assert [p[-1] for p in _pr] == ["QW", "SI", "LN", "NH"] and _pr[0][2] == 4.3 and _pr[0][4] == 4.0, _pr
 # 견본 지표: 그룹 안 도형과 연결선까지 셈
 import samples as _smp  # noqa: E402
 _grp = _ds.shapes.add_group_shape([_b[0], _b[1]])
