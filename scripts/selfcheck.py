@@ -209,7 +209,7 @@ slides = [n for n in z.namelist() if n.startswith("ppt/slides/slide") and n.ends
 x = "".join(z.read(n).decode("utf8") for n in slides)
 assert len(slides) == 14, slides   # 표지, 목차, 본문 11, Thank you
 assert x.count("<p:cxnSp>") == x.count("<a:stCxn") == x.count("<a:endCxn"), "연결선이 도형에 안 붙음"
-assert "Pretendard" not in x and "Malgun" not in x
+assert "Pretendard" in x and "Noto Sans" not in x and "Malgun" not in x   # 글꼴은 Pretendard 하나
 from pptx import Presentation  # noqa: E402
 assert len(Presentation(out).slides) == 14
 _ly = [sl.slide_layout.name for sl in Presentation(out).slides]
@@ -388,14 +388,14 @@ _fd = tempfile.mkdtemp(prefix="ixfont_")
 render._font_dirs = lambda: [_fd]
 render._registry_fonts, render._fc_families = (lambda: ["Arial (TrueType)"]), (lambda: "DejaVu Sans")
 assert not render.font_installed()
-render._registry_fonts = lambda: ["Arial (TrueType)", "Noto Sans KR (TrueType)"]
-assert render.font_installed(), "등록 값 Noto Sans KR 을 못 봄"
-render._registry_fonts, render._fc_families = (lambda: []), (lambda: "Noto Sans KR:style=Regular")
-assert render.font_installed(), "fc-list 의 Noto Sans KR 을 못 봄"
+render._registry_fonts = lambda: ["Arial (TrueType)", "Pretendard Regular (TrueType)"]
+assert render.font_installed(), "등록 값 Pretendard 를 못 봄"
+render._registry_fonts, render._fc_families = (lambda: []), (lambda: "Pretendard:style=Regular")
+assert render.font_installed(), "fc-list 의 Pretendard 를 못 봄"
 render._fc_families = lambda: ""
-open(os.path.join(_fd, "NotoSansKR-VF.ttf"), "w").close()
+open(os.path.join(_fd, "Pretendard-Regular.otf"), "w").close()
 assert render.font_installed(), "글꼴 폴더 파일을 못 봄"
-os.remove(os.path.join(_fd, "NotoSansKR-VF.ttf"))
+os.remove(os.path.join(_fd, "Pretendard-Regular.otf"))
 assert not render.font_installed()
 _argv = sys.argv
 sys.argv = ["render.py", _p, os.path.join(_tmp, "r")]

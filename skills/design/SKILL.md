@@ -32,6 +32,12 @@ description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구�
 - 같은 틀이 연달아 나오지 않게: 구역이 다른 기능끼리 묶고, 흐름이 핵심인 기능은 `chevrons` 를 쓴 장으로 따로 만듦
 - 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`, 단계형 장 `step_header`, `summary_bar`, `backdrop`, 헤드라인 `headline`, 말풍선 `speech_bubble`)
 
+## 0-3. 설계 문서 기본기와 구성도 읽힘
+- 설계 문서는 사용자 흐름, 처리 순서(시퀀스), 배치도, 흐름 방식, 내부 구조 순으로 장을 짜고 고른 방식과 이유를 한 줄씩 적음: `references/아키텍처_설계_순서.md`
+- 구성도는 한 그림에 한 질문만 답하고, 포함 관계(제품 이름이 하위 기능을 감쌈), 값의 원천과 도착, 화살표 뜻, 기능 색 구분이 보이게 함: `references/구성도_읽힘_규칙.md`, 출발점 `scripts/example_diagram.py`
+- DocGrid: `header=` 를 쓰면 `area=True`, 기능 묶음마다 `tone="collect|send|manage|store|report"`, 처리 상자는 `flow="process"` (원천은 `"source"`, 도착은 `"sink"`), 기능 색 범례 `legend(..., kind="square")`
+- 글꼴은 Pretendard 로 고정
+
 ## 1. 구성도 장 (`d.page(..., doc=True)`)
 ```python
 g = DocGrid(s, rows=5)                                       # 줄 5개, 도식은 오른쪽 끝까지

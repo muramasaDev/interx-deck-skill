@@ -5,7 +5,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 from ixdeck import (BLACK, GRAY_L, GREEN, NAVY, SLATE0, SLATE3, SLATE6, WHITE, _adj, _fill, _font, _lh, _line,
-                    _no_style_effects, _obst, _reg, _set_text, _text_w, big_arrow, box, text)
+                    _no_style_effects, _obst, _reg, _set_flow, _set_text, _text_w, big_arrow, box, text)
 
 __all__ = ["AMBER", "ROLE", "role_box", "block_arrow", "pill", "abbr_legend", "step_header", "summary_bar", "speech_bubble", "headline",
            "backdrop"]
@@ -14,12 +14,13 @@ AMBER = "FFC000"
 ROLE = {"base": (SLATE6, WHITE), "ai": (GREEN, WHITE), "ext": (AMBER, BLACK), "platform": (NAVY, WHITE)}   # 칩 색의 뜻 (바탕, 글자)
 
 
-def role_box(s, x, y, w, h, t, role="base", sub=None, size=7.26):
+def role_box(s, x, y, w, h, t, role="base", sub=None, size=7.26, flow=None):
     """역할 색 칩. role: base 기존 모듈(회색), ai AI 및 에이전트(초록), ext 확장 항목(노랑), platform 핵심 서버(남색). sub: 작은 부제"""
     if role not in ROLE:
         raise ValueError(f"role_box role '{role}' 은 {', '.join(ROLE)} 중 하나")
     fill, fg = ROLE[role]
     sh = box(s, x, y, w, h, [(t, fg)] + ([(sub, fg)] if sub else []), fill=fill, size=size, bold=True, color=fg)
+    _set_flow(s, sh, t, flow)   # flow: source, sink, process 이면 선이 빠졌는지 구성도 주의가 확인
     if sub:   # 부제는 한 단계 작게
         for r in sh.text_frame.paragraphs[1].runs:
             r.font.size = Pt(5.44)

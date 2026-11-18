@@ -1,6 +1,6 @@
 ---
 name: using
-description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 공통 규칙과 갈래 고르기. 어느 갈래(ixdeck:report 보고 자료, ixdeck:design 설계 문서와 구성도와 다른 양식 문서의 본문, ixdeck:okr 월간 Individual OKR)를 쓸지, 작성자 묻기, 덱 구성(표지, 목차, 본문, Thank you), 제목, 글꼴 Noto Sans KR, 줄 바꿈, 글쓰기와 내용 규칙, 색, 아이콘, 관문(gate.py), DRM 주의. "INTERX 양식", "회사 양식 PPT", "PPT 만들어줘", "덱 만들어줘" 요청에 먼저 쓴다.
+description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 공통 규칙과 갈래 고르기. 어느 갈래(ixdeck:report 보고 자료, ixdeck:design 설계 문서와 구성도와 다른 양식 문서의 본문, ixdeck:okr 월간 Individual OKR)를 쓸지, 작성자 묻기, 덱 구성(표지, 목차, 본문, Thank you), 제목, 글꼴 Pretendard, 줄 바꿈, 글쓰기와 내용 규칙, 색, 아이콘, 관문(gate.py), DRM 주의. "INTERX 양식", "회사 양식 PPT", "PPT 만들어줘", "덱 만들어줘" 요청에 먼저 쓴다.
 ---
 
 # ixdeck: 공통 규칙과 갈래
@@ -54,7 +54,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | 순서 | 장 | 레이아웃 | 만드는 곳 |
 |---|---|---|---|
 | 1 | 표지 | 3_사용자 지정 레이아웃 | `d.cover(제목, "2026.11.10")` 날짜는 덱 기준일(오늘 자동 아님), 제목 한 줄(한글 약 15자, 넘으면 멈춤) |
-| 2 | 목차 | 5_contents-02 | 저장이 채움: 절마다 주황 번호, 절 이름, 그 아래 장 주제(끝 괄호 뺌). 페이지 범위는 적지 않음. 절 6개부터 두 열 |
+| 2 | 목차 | 5_contents-02 | 저장이 채움: 절마다 주황 번호, 절 이름, 그 아래 장 주제(끝 괄호 뺌). 페이지 범위는 적지 않음. 절 5개 이하는 한 열(칸이 모자라면 두 열), 6개부터 두 열, 한 절은 최대 4줄(넘으면 '외 N개') |
 | 3 ~ | 본문 | 본문_소제목 O | `d.page(...)` (보고형, 구성도 같은 틀) |
 | 끝 | Thank you | 앤드페이지_다크네이비 | 저장이 붙임 |
 - 다른 양식 문서에 본문 장만 옮겨 넣는 빌더는 `Deck(author, parts_only=True)` (design 갈래 참고)
@@ -130,7 +130,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 - 바뀐 사실이 있으면 모든 자료에서 옛 값을 찾아 같이 고침
 
 **글자 (저장이 자동)**
-- 글꼴 Noto Sans KR 하나(굵기 이름 글꼴은 굵게 켬으로), 글상자 세로 중간 맞춤, 줄 간격 1.25 또는 1.5(`text(..., line=1.5)`)
+- 글꼴 Pretendard 하나(굵기 이름 글꼴은 굵게 켬으로), 글상자 세로 중간 맞춤, 줄 간격 1.25 또는 1.5(`text(..., line=1.5)`)
 - 한글 줄 바꿈: 글 조각마다 `lang="ko-KR"`, 문단마다 `latinLnBrk="0"`(빠지면 낱말 중간에서 줄이 바뀜)
 - 숫자 및 단위(%, ℃, µm, mm, 초, 분, 시간, 개, 건, 회 등) 사이 공백은 저장이 줄 바꿈 없는 공백으로 바꿈 ('95.7 %' 가 두 줄로 갈리지 않음). '1 ~ 4' 같은 범위는 그대로
 - 마침표로 끝난 문장 다음 문장은 새 줄, 한 줄을 넘는 문장은 쉼표 바로 뒤에서 끊음(`ko_breaks`)
@@ -184,7 +184,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | check_ban.py | 금지 표현 (차트, 수식 글, 발표자 노트 포함), 자리표시자 (TODO, TBD, xxx, lorem, [insert, '텍스트를 입력', '예시 값', '요약 한 줄') |
 | check_text.py | AI 투 수식어, 서술체, 느낌표 (실패), 의인화, 명사 잇기, 긴 줄, im-not-ai 바꿀 어휘, 날짜 표기 3종 이상 혼용 (주의). 발표자 노트도 검사(서술체 제외) |
 | deck_text.py | 장마다 글을 읽는 순서로 `text.md` 에, 장별 소제목 및 요약 줄만 `titles.md` 에 (사람이 쓴 덱 검토용) |
-| render.py | 장마다 PNG, 모아 보기 sheet.png (임시 폴더 `interx_gate/<덱>/`, PDF 는 만들지 않음). Windows 는 PowerPoint, Mac 은 PowerPoint 또는 LibreOffice. Noto Sans KR 이 없으면 종료 코드 3 으로 멈춤 (글꼴 폴더 파일, Windows 글꼴 등록 값(HKLM, HKCU), Mac 은 fc-list 로 확인) |
+| render.py | 장마다 PNG, 모아 보기 sheet.png (임시 폴더 `interx_gate/<덱>/`, PDF 는 만들지 않음). Windows 는 PowerPoint, Mac 은 PowerPoint 또는 LibreOffice. Pretendard 가 없으면 종료 코드 3 으로 멈춤 (글꼴 폴더 파일, Windows 글꼴 등록 값(HKLM, HKCU), Mac 은 fc-list 로 확인) |
 | gate.py --verify | 덱 해시를 통과 기록(개인 설정 폴더 `gate/`)과 대조. 같으면 종료 코드 0 |
 - build.py 마지막 줄은 `print(OUT)`
 - **장 검토 목록** (자동 검사가 못 보는 것): 장마다 메시지 하나와 그 요약 줄, 선 흐름과 번호 순서, 같은 것은 같은 이름과 색과 아이콘, 빈 칸을 행 높이나 큰 글자로 메우지 않음, 빈 곳을 블록으로 채우지 않음 (패널이 내용에 맞춰 줄어듦), 캡처 네모가 맞는 자리, 목차가 핵심만 담음, 처음 보는 사람이 이해함
@@ -198,7 +198,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | 빈 파일에서 시작 | `example_build.py` 복사 |
 | 작성자를 확인하지 않음, 템플릿 예시 값(AX Data Design)을 씀 | 2절 0번, 개인 설정 |
 | 목차나 Thank you 를 손으로 만듦 | `Deck` 이 자동 |
-| 다른 글꼴, 굵기를 글꼴 이름으로 | `bold=True`, 저장이 Noto Sans KR 하나로 |
+| 다른 글꼴, 굵기를 글꼴 이름으로 | `bold=True`, 저장이 Pretendard 하나로 |
 | 장마다 핵심 수치 줄 | 숫자가 메시지인 장만 |
 | 표 행 높이를 키워 빈 패널을 메움 | 패널이 내용에 맞춰 줄어듦, 채우기 블록 금지 |
 | 패널, 묶음 안 좌표를 손으로 씀 | `report_panels`, `DocGrid().group().box(줄, 칸)` |

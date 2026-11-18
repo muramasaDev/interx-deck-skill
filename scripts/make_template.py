@@ -16,7 +16,7 @@ THEME_COLORS = {  # 견본 색에서 고름
     "accent5": "28303A",  # 남회색 900 (패널 머리)
     "accent6": "FF0000",  # 빨강 설명 문구
 }
-FONT = "Noto Sans KR"
+FONT = "Pretendard"
 TYPOS = {
     "Denstiy": "Density",
     "Schma ": "Schema ",

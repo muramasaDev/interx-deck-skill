@@ -18,7 +18,7 @@ SOFT = "--soft" in sys.argv
 path = args[0]
 want = int(args[1]) if len(args) > 1 else None
 ALLOWED = {5.44, 6.35, 7.26, 8.0, 8.16, 9.0, 9.07, 10.0, 10.5, 11.0, 12.0, 14.0, 16.32, 20.0}
-FONT = "Noto Sans KR"
+FONT = "Pretendard"
 FOOTER_Y = 7.215      # 꼬리말 선 (바닥)
 LINE_H = 1.2 * 1.25   # 한 줄 높이 = 글자 x 1.2 x 줄 간격 1.25
 
@@ -108,7 +108,7 @@ for n in slides:
     ids = re.findall(r'<p:cNvPr id="(\d+)"', x)
     if len(ids) != len(set(ids)):
         bad.append(f"{tag}: 도형 번호 중복 {sorted({i for i in ids if ids.count(i) > 1})}")
-    fonts = {f for k, f in re.findall(r'<a:(latin|ea|cs|sym|buFont|font)[^>]*typeface="([^"+][^"]*)"', x)
+    fonts = {f for k, f in re.findall(r'<a:(latin|ea|cs|sym|buFont|font)\b[^>]*typeface="([^"+][^"]*)"', x)
              if f not in (FONT, "Cambria Math") and not (k in ("sym", "buFont") and f.startswith(("Wingdings", "Symbol", "Webdings")))}
     if fonts:
         bad.append(f"{tag}: {FONT} 아닌 글꼴 {sorted(fonts)} (굵기 이름 글꼴도 안 됨, 굵게 켬으로)")
@@ -254,7 +254,7 @@ for n in slides:  # lang 이 ko-KR 아니면 낱말 중간 줄 바꿈
 for n in z.namelist():  # 레이아웃, 마스터, 테마, 차트 글꼴도 하나
     if re.match(r"ppt/(slideLayouts|slideMasters|notesMasters|notesSlides|handoutMasters|theme|charts)/[^/]+\.xml$", n):
         xx = z.read(n).decode("utf8")
-        other = {f for k, f in re.findall(r'<a:(latin|ea|cs|sym|buFont|font)[^>]*typeface="([^"+]*)"', xx)
+        other = {f for k, f in re.findall(r'<a:(latin|ea|cs|sym|buFont|font)\b[^>]*typeface="([^"+]*)"', xx)
                  if f != FONT and not (k in ("sym", "buFont") and f.startswith(("Wingdings", "Symbol", "Webdings")))}
         if other:
             bad.append(f"{n.split('/')[-1]}: {FONT} 아닌 글꼴 {sorted(other)}")

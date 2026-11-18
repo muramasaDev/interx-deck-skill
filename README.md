@@ -18,7 +18,7 @@ npx --allow-git=all muramasaDev/interx-deck-skill
 - Python, 패키지, 글꼴은 설치 중 자동 설치
 - 설치 뒤 Claude Code 다시 시작
 - 업데이트: 같은 명령 (새 판이 나오면 Claude Code 시작 때 알림)
-- 점검: 명령 끝에 `doctor` / 제거: 명령 끝에 `uninstall` / 특정 판: 명령 끝에 `#v1.7.5`
+- 점검: 명령 끝에 `doctor` / 제거: 명령 끝에 `uninstall` / 특정 판: 명령 끝에 `#v1.7.6`
 
 ## Use
 
@@ -48,18 +48,20 @@ Claude Code 에서 말로 요청
 
 ## Notice
 
+- 1.7.6 부터 글꼴이 Pretendard 로 바뀜: 설치 명령을 다시 실행하면 Pretendard 가 설치되고 (안 보이면 다시 로그인), 이전 판으로 만든 덱은 글꼴 이름이 Noto Sans KR 이라 빌더를 다시 돌려야 바뀜
 - 1.7.4 부터 관문이 PDF 를 자동으로 만들지 않음: 필요하면 PowerPoint 에서 직접 저장
 - 1.7.2 부터 이름이 `interx-deck` 에서 `ixdeck` 으로 바뀜: 설치 명령은 같고 호출은 `/ixdeck:using` 등. 옛 설치 경로 `skills/interx-deck` 는 새 폴더로 연결해 두며 덱 빌더는 고치지 않아도 동작
 - 회사 DRM: PowerPoint 로 한 번 연 파일은 Claude 가 다시 읽지 못함. 받을 사람에게는 사용자가 직접 PDF 로 저장해 전달
 - macOS 에서 PowerPoint 가 없으면 LibreOffice 로 렌더 (줄 바꿈이 조금 다를 수 있음)
 - 고객사 이름, 설비 이름, 회사 데이터는 공개 범위가 정해지기 전에 외부 서비스로 보내지 않음
-- INTERX 사내 전용. 함께 배포하는 글꼴 Noto Sans KR 은 SIL OFL 1.1
+- INTERX 사내 전용. 함께 배포하는 글꼴 Pretendard 는 SIL OFL 1.1 (assets/fonts/OFL-Pretendard.txt)
 - AI 티 판정 규칙: im-not-ai (MIT)
 
 ## Release
 
 | 판 | 날짜 | 핵심 내용 |
 |---|---|---|
+| v1.7.6 | 2026-11-18 | 글꼴을 Pretendard 로 고정 (설치기가 Pretendard 설치), 목차를 같은 높이 격자로 정렬, 구성도 읽힘 (제품 이름이 하위 기능을 감쌈, 기능 색, 처리 상자 원천과 도착 확인), 구성도 예제 `example_diagram.py`, 아키텍처 설계 순서 |
 | v1.7.5 | 2026-11-18 | 덱 용량 95% 감소 (6장 덱 23MB 에서 1.2MB): 템플릿의 쓰이지 않는 임베드 글꼴 22MB 제거, 설치할 때 받는 용량도 줄어듦. 화면은 화소 단위로 같음 |
 | v1.7.4 | 2026-11-18 | 설계 문서 덱 출발점 예제 `example_doc.py`, 장 함수의 `source=` (문서 덱은 한 장에만 출처), 구성도 헤드라인 키워드 강조 및 캡처 뒤 쉐브론 배경 부품 |
 | v1.7.3 | 2026-11-18 | xlsx 정의서 기본 서식을 공공기관 정의서식 회색 계열로 (연한 회색 머리, 검정 굵은 글씨), 정의서 종류별 권장 열 구성, 구성도 단계형 장 부품 (쉐브론 머리띠, 둥근 요약바, 말풍선), 패널 제목과 표 제목 중복 주의 |

@@ -55,11 +55,11 @@ def _fc_families():
 
 
 def font_installed():
-    """Noto Sans KR 설치 여부 (없으면 렌더가 다른 글꼴로 줄 바꿈이 달라짐)
+    """Pretendard 설치 여부 (없으면 렌더가 다른 글꼴로 줄 바꿈이 달라짐)
     - 글꼴 폴더 파일, Windows 등록 값, fc-list 순"""
-    if any(glob.glob(os.path.join(d, "NotoSansKR*")) for d in _font_dirs()):
+    if any(glob.glob(os.path.join(d, "Pretendard*")) for d in _font_dirs()):
         return True
-    return any("noto sans kr" in n.lower() for n in _registry_fonts()) or "noto sans kr" in _fc_families().lower()
+    return any("pretendard" in n.lower() for n in _registry_fonts()) or "pretendard" in _fc_families().lower()
 
 
 def _windows(a):
@@ -144,8 +144,8 @@ def main():
     ap.add_argument("--pdf")
     a = ap.parse_args()
     if not font_installed():
-        sys.stderr.write("렌더 중단: Noto Sans KR 글꼴이 설치되어 있지 않음 (" + ", ".join(_font_dirs()) +
-                         "). 렌더가 다른 글꼴로 줄 바꿈이 달라지므로 assets/fonts/NotoSansKR-VF.ttf 를 설치한 뒤 다시\n")
+        sys.stderr.write("렌더 중단: Pretendard 글꼴이 설치되어 있지 않음 (" + ", ".join(_font_dirs()) +
+                         "). 렌더가 다른 글꼴로 줄 바꿈이 달라지므로 assets/fonts/Pretendard-Regular.otf 와 Pretendard-Bold.otf 를 설치한 뒤 다시\n")
         sys.exit(3)
     if a.pdf:
         a.pdf = os.path.abspath(a.pdf)

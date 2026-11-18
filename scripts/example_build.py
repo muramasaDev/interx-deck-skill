@@ -141,7 +141,7 @@ s = d.page("수집 구성 (설비 3대 기준)", doc=True,
 g = DocGrid(s, right=None, rows=7, bottom=6.0)
 g.source("source", [("plc", "설비 1"), ("plc", "설비 2"), ("plc", "설비 3")], title="설비 PLC")
 plcs = g.icons
-e = g.group("edge", "EdgePC", kind="edge", sub="설비 옆", header="수집 프로그램", cols=2, area=False)
+e = g.group("edge", "EdgePC", kind="edge", sub="설비 옆", header="수집 프로그램", cols=2)   # header 아래 영역이 하위 묶음을 감쌈
 s1 = e.sub(0, 0, 6, header="수집 및 보고")
 cache, core = s1.box(1, "수집 계획 보관"), s1.box(3, "수집 코어")
 report, alarm = s1.box(5, "현황 보고"), s1.box(6, "알림 메일 발송")

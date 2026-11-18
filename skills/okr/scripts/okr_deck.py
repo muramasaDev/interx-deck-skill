@@ -28,8 +28,8 @@ UNDONE = re.compile(r"미실시|미착수|미진입|미완|보류|연기|이월"
 ACH_MAX = 16                                                              # 달성현황 글자 한계
 MAX_ROWS = 5  # 넘으면 아래 Plan, Review 와 겹침
 MERGE_COLS = (0, 1, 9)  # 그룹 단위로 세로 병합되는 열
-FONTS = ('<a:latin typeface="Noto Sans KR"/><a:ea typeface="Noto Sans KR"/>'
-         '<a:cs typeface="Noto Sans KR"/><a:sym typeface="Noto Sans KR"/>')
+FONTS = ('<a:latin typeface="Pretendard"/><a:ea typeface="Pretendard"/>'
+         '<a:cs typeface="Pretendard"/><a:sym typeface="Pretendard"/>')
 
 
 def A(tag):
@@ -511,7 +511,7 @@ def panel_xml(shape_id, x, y, w, h, bullets, heading="핵심 개요"):
     body = "".join(
         '<a:p><a:pPr marL="171450" indent="-171450" algn="l"><a:lnSpc><a:spcPct val="130000"/></a:lnSpc>'
         '<a:spcBef><a:spcPts val="900"/></a:spcBef><a:buClr><a:schemeClr val="dk1"/></a:buClr>'
-        '<a:buSzPts val="1000"/><a:buFont typeface="Noto Sans KR"/><a:buChar char="-"/></a:pPr>'
+        '<a:buSzPts val="1000"/><a:buFont typeface="Pretendard"/><a:buChar char="-"/></a:pPr>'
         f'<a:r>{_rpr(1000, False, "dk1")}<a:t>{_esc(b)}</a:t></a:r></a:p>' for b in bullets)
     return etree.fromstring(
         f'<p:sp xmlns:a="{NS_A}" xmlns:p="{NS_P}"><p:nvSpPr><p:cNvPr id="{shape_id}" name="핵심 개요 {shape_id}"/>'

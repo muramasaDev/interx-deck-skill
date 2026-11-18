@@ -25,7 +25,7 @@ ASSETS = os.path.join(os.path.dirname(HERE), "assets")
 TEMPLATE = os.path.join(ASSETS, "interx_template.pptx")
 ICONS = os.path.join(ASSETS, "icons")
 LOGOS = os.path.join(ASSETS, "logos")
-FONT = "Noto Sans KR"
+FONT = "Pretendard"
 LINE = 1.25                # 1.25 또는 1.5 만
 
 # 기본 양식 색
@@ -47,6 +47,9 @@ ORANGE = "EA580B"      # 회사 주황: 목차 번호만
 ACCENT = NAVY          # 강조: 번호 원, 이름표, 지금 단계, 핵심 행과 수치, 주 흐름
 RED = "FF0000"
 TEAL = "299288"        # 패널 소제목, 점선
+# 기능 묶음 색 (머리띠 색, 옅은 바탕): 같은 기능은 같은 색, 한 장에 넷 이하. collect 수집, store 저장, send 전송, manage 관리, report 현황 및 알림
+TONES = {"collect": ("1F4E8C", "EAF0F8"), "store": ("546680", "EFF1F5"), "send": ("299288", "E6F3F1"),
+         "manage": ("6B4E8F", "F0EBF5"), "report": ("A86B12", "FBF3E3")}
 WHITE = "FFFFFF"
 BLACK = "000000"
 
@@ -534,9 +537,9 @@ def db(s, x, y, w, h, t, size=7.26, line=None):
     return _obst(s, box(s, x, y, w, h, t, fill=SLATE6, line=line, lw=0.75, size=size, bold=True, color=WHITE))
 
 
-def area(s, x, y, w, h, line=SLATE4):
+def area(s, x, y, w, h, line=SLATE4, fill=SLATE0):
     """서버 아래 모듈 묶음 영역"""
-    a = box(s, x, y, w, h, fill=SLATE0, line=line, lw=0.25, geom="round", radius=0)
+    a = box(s, x, y, w, h, fill=fill, line=line, lw=0.25, geom="round", radius=0)
     _wall(s, a)
     return a
 
@@ -564,12 +567,14 @@ def more(s, x, y, color=GRAY):
 
 
 def legend(s, x, y, items, pitch=0.17, kind="oval"):
-    """종류 범례. items=[(색, 이름)] 또는 kind="line" 에서 [(색, 이름, 점선 종류)]"""
+    """종류 범례. items=[(색, 이름)], kind="square" 는 색 네모(기능 묶음 색), kind="line" 에서 [(색, 이름, 점선 종류)]"""
     for i, it in enumerate(items):
         c, t, dash = (tuple(it) + (None,))[:3]
         yy = y + i * pitch
         if kind == "oval":
             box(s, x, yy + 0.02, 0.1, 0.1, fill=None, line=c, lw=1.25, geom="oval")
+        elif kind == "square":   # 기능 묶음 색 범례: 색 네모 + 이름
+            box(s, x, yy + 0.02, 0.12, 0.12, fill=c)
         elif dash:
             ln = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(x), Inches(yy + 0.078), Inches(0.16), 0)   # 높이 0 테두리 = 선
             ln.fill.background()
@@ -696,6 +701,8 @@ def connect(s, a, side_a, b, side_b, color=GRAY, width=1.5, head="end", dash=Non
            else _route(a, side_a, b, side_b, mid, check=False))
     R["segs"].extend(zip(pts, pts[1:]))
     R["links"].append((pts, a.shape_id, b.shape_id, f"{a.name} -> {b.name}"))
+    if head != "end":   # 양방향, 머리 없음, 시작 머리는 방향을 단정하지 않고 양쪽 끝이 받고 내보내는 것으로 셈
+        R.setdefault("bidir", set()).add((a.shape_id, b.shape_id))
     for sh, sd in ((a, side_a), (b, side_b)):
         R["used"][(sh.shape_id, sd)] = R["used"].get((sh.shape_id, sd), 0) + 1
     if text:
@@ -2226,6 +2233,8 @@ def link(s, a, b, color=GRAY, width=1.5, head="end", dash=None, text=None, step=
     R["used"][(ib, sb)] = R["used"].get((ib, sb), 0) + 1
     R["segs"].extend(zip(pts, pts[1:]))
     R["links"].append((pts, ia, ib, f"{a.name} -> {b.name}"))
+    if head != "end":
+        R.setdefault("bidir", set()).add((ia, ib))
     if cut:  # 끊긴 연결: 가장 긴 구간에 빨간 ✕
         p_, q_ = max(zip(pts, pts[1:]), key=lambda pq: abs(pq[1][0] - pq[0][0]) + abs(pq[1][1] - pq[0][1]))
         mx, my = (p_[0] + q_[0]) / 2, (p_[1] + q_[1]) / 2
@@ -2458,6 +2467,21 @@ def diagram_notes(s):
     duo = _duo_keys()
     if icons & duo and icons - duo:
         out.append(f"두 색 구성도 아이콘과 옛 색 아이콘이 섞임 ({', '.join(sorted(icons - duo))}): 한 장은 한 세트로")
+    ins, outs = {}, {}   # 상자마다 들어오는 선과 나가는 선. fan, bundle, 양방향 선은 양쪽 끝이 받고 내보내는 것으로 셈
+    for _, a_, b_, nm in _reg(s).get("links", ()):
+        outs[a_], ins[b_] = outs.get(a_, 0) + 1, ins.get(b_, 0) + 1
+        if nm.startswith(("fan ", "bundle")):
+            outs[b_], ins[a_] = outs.get(b_, 0) + 1, ins.get(a_, 0) + 1
+    for a_, b_ in _reg(s).get("bidir", ()):
+        outs[b_], ins[a_] = outs.get(b_, 0) + 1, ins.get(a_, 0) + 1
+    for sid, (role, name) in _reg(s).get("flow_roles", {}).items():
+        i_, o_ = ins.get(sid, 0), outs.get(sid, 0)
+        if role == "process" and not (i_ and o_):
+            out.append(f"처리 상자 '{name}' 에 {'들어오는' if not i_ else '나가는'} 선이 없음: 값이 어디서 들어와 어디로 가는지 (원천과 도착) 선으로 보여야 함")
+        elif role == "source" and not o_:
+            out.append(f"원천 상자 '{name}' 에 나가는 선이 없음")
+        elif role == "sink" and not i_:
+            out.append(f"도착 상자 '{name}' 에 들어오는 선이 없음")
     return out
 
 
@@ -2656,7 +2680,8 @@ class DocGrid:
     def y(self, r):
         return self.ys[r]
 
-    def group(self, col, title, kind="platform", sub=None, rows=None, header=None, cols=1, area=True, badge=None):
+    def group(self, col, title, kind="platform", sub=None, rows=None, header=None, cols=1, area=True, badge=None, tone=None):
+        """header: 묶음 안 제품이나 프로그램 이름 띠. area=True 면 그 아래 영역이 하위 묶음을 감싸 '이 안에 들어 있음'이 보임. tone: 기능 색(TONES)"""
         if col == "edge" and not getattr(self, "_has_source", False) and "source" in self.cols:
             # 원천 열이 없으면 edge 열을 넓힘
             sx, _ = self.cols["source"]
@@ -2674,7 +2699,7 @@ class DocGrid:
                 raise ValueError(f"{col} 열 묶음 '{title}' 이 위아래 묶음과 겹치거나 0.15 in 보다 가까움: "
                                  "줄 사이를 한 줄 더 비우거나(rows 늘림), 아래 묶음을 header=None, area=False 로")
         self._used.setdefault(col, []).append((top, bottom))
-        g_ = _Group(self, x, w, top, bottom, title, kind, sub, header, cols, use_area=area)
+        g_ = _Group(self, x, w, top, bottom, title, kind, sub, header, cols, use_area=area, tone=tone)
         if badge and g_.header is not None:
             hx, hy, _, hy1 = _bb(g_.header)
             hh = hy1 - hy
@@ -2718,22 +2743,28 @@ class DocGrid:
 
 
 class _Group:
-    def __init__(self, g, x, w, top, bottom, title, kind, sub, header, cols, use_area):
+    def __init__(self, g, x, w, top, bottom, title, kind, sub, header, cols, use_area, tone=None):
         self.g, self.s = g, g.s
+        if tone is not None and tone not in TONES:
+            raise ValueError(f"tone '{tone}' 은 {', '.join(TONES)} 중 하나")
+        if tone and not header and not use_area:
+            _notice(self.s, f"묶음 '{title}' 의 tone '{tone}' 을 칠할 자리가 없음 (header 와 area 가 모두 없음)")
+        if header and not use_area:
+            _notice(self.s, f"묶음 제목 '{header}' 아래에 하위 묶음을 감싸는 영역이 없음 (area=False): 이 이름 안에 하위 묶음이 들어 있는지 보이지 않음. area=True 로")
         self.body = frame(self.s, x, top, w, bottom - top, title, kind=kind, sub=sub)
         ix, iw = x + g.PAD, w - 2 * g.PAD
         y = top + 0.54
         self.header = None
         if header:
-            self.header = server(self.s, ix, y, iw, 0.27, header)
+            self.header = server(self.s, ix, y, iw, 0.27, header, fill=TONES[tone][0] if tone else GRAY)
             y += 0.45
-        self.area = area(self.s, ix, y, iw, bottom - 0.25 - y) if use_area else None
+        self.area = area(self.s, ix, y, iw, bottom - 0.25 - y, fill=TONES[tone][1] if tone else SLATE0) if use_area else None
         self.ix, self.iw = (ix + g.INNER, iw - 2 * g.INNER) if use_area else (ix, iw)
         self.cw = self.iw / cols
         self.ncols = cols
 
-    def box(self, r, c, t, kind="db", span=1, w=None, icon_=None):
-        """줄 r, 칸 c 에 상자. kind: db, server"""
+    def box(self, r, c, t, kind="db", span=1, w=None, icon_=None, flow=None):
+        """줄 r, 칸 c 에 상자. kind: db, server. flow: source(값을 내보내기만), sink(받기만), process(받아서 내보냄)이면 선이 빠졌는지 확인"""
         kw_w = w is not None
         if not (0 <= r < self.g.n) or not (0 <= c and c + span <= self.ncols):
             raise ValueError(f"'{t}' 자리 (줄 {r}, 칸 {c}, span {span}) 가 묶음(줄 {self.g.n}, 칸 {self.ncols})을 벗어남")
@@ -2752,6 +2783,7 @@ class _Group:
             cx -= 0.2
         b = fn(self.s, cx - bw / 2, y, bw, self.g.bh, t)
         _reg(self.s).setdefault("grid_boxes", []).append((b.shape_id, t))
+        _set_flow(self.s, b, t, flow)
         pic = None
         if icon_:
             ih = self.g.bh + 0.12
@@ -2760,8 +2792,10 @@ class _Group:
             _col_box(self.s, (id(self), c, span, bool(icon_)), b, self.cw * span - (0.5 if icon_ else 0.42), pic)
         return b
 
-    def sub(self, c, r0, r1, header=None, span=1, caption=None):
-        """묶음 안 작은 묶음 (칸 c, 줄 r0 ~ r1)"""
+    def sub(self, c, r0, r1, header=None, span=1, caption=None, tone=None):
+        """묶음 안 작은 묶음 (칸 c, 줄 r0 ~ r1). tone: 기능 색(TONES), 같은 기능은 같은 색"""
+        if tone is not None and tone not in TONES:
+            raise ValueError(f"tone '{tone}' 은 {', '.join(TONES)} 중 하나")
         if not (0 <= r0 <= r1 < self.g.n) or not (0 <= c and c + span <= self.ncols):
             raise ValueError(f"sub 자리 (칸 {c}, span {span}, 줄 {r0} ~ {r1}) 가 묶음을 벗어남")
         g = self.g
@@ -2769,13 +2803,13 @@ class _Group:
         out = _Sub(self, x0, w)
         top_r = r0
         if header:
-            out.header = server(self.s, x0, g.y(r0) - g.bh / 2 - 0.015, w, g.bh + 0.03, header)
+            out.header = server(self.s, x0, g.y(r0) - g.bh / 2 - 0.015, w, g.bh + 0.03, header, fill=TONES[tone][0] if tone else GRAY)
             top_r = r0 + 1
             if top_r > r1:
                 return out
         ay0 = g.y(top_r) - g.bh / 2 - 0.12
         ay1 = g.y(r1) + g.bh / 2 + 0.12
-        out.area = area(self.s, x0, ay0, w, ay1 - ay0)
+        out.area = area(self.s, x0, ay0, w, ay1 - ay0, fill=TONES[tone][1] if tone else SLATE0)
         if caption:
             label(self.s, x0, g.y(top_r) - 0.1, w, caption)
         return out
@@ -2794,15 +2828,25 @@ class _Sub:
     def __init__(self, grp, x, w):
         self.grp, self.s, self.x, self.w, self.header, self.area = grp, grp.s, x, w, None, None
 
-    def box(self, r, t, kind="db", w=None):
+    def box(self, r, t, kind="db", w=None, flow=None):
         g = self.grp.g
         bw = w or min(self.w - 0.24, max(1.0, _text_w(t, 7.26) * 1.1 + 0.2))
         fn = db if kind == "db" else server
         b = fn(self.s, self.x + (self.w - bw) / 2, g.y(r) - g.bh / 2, bw, g.bh, t)
         _reg(self.s).setdefault("grid_boxes", []).append((b.shape_id, t))
+        _set_flow(self.s, b, t, flow)
         if not w:
             _col_box(self.s, (id(self),), b, self.w - 0.24)
         return b
+
+
+def _set_flow(s, shape, t, flow):
+    """상자의 흐름 역할을 적어 둠 (구성도 주의가 선이 빠졌는지 봄)"""
+    if flow is None:
+        return
+    if flow not in ("source", "sink", "process"):
+        raise ValueError(f"flow '{flow}' 은 source(내보내기만), sink(받기만), process(받아서 내보냄) 중 하나")
+    _reg(s).setdefault("flow_roles", {})[shape.shape_id] = (flow, t)
 
 
 def note_by(s, shape, head, lines=()):
@@ -3213,32 +3257,64 @@ class Deck:
         return s
 
     def _fill_toc(self):
-        """목차: 절 번호, 절 이름, 장 주제"""
+        """목차: 절 번호, 절 이름, 장 주제. 한 열(절 5개 이하)은 절마다 자기 줄 수만큼, 두 열은 모든 절을 같은 높이의 격자에 놓아
+        열이 달라도 번호, 이름, 구분선이 같은 높이에 섬. 한 절은 최대 4줄(넘으면 '외 N개'), 칸이 모자라면 줄 간격과 줄 수를 줄임"""
         items = getattr(self, "_toc_items", [])
         if not items:
             raise ValueError("목차에 넣을 절이 없음: d.section() 과 d.page() 로 장을 만든다")
         s = self._toc
-        cols = 1 if len(items) <= 5 else 2
+        top, bottom, gap0 = 1.45, 7.1, 0.14
+        avail = bottom - top
+
+        def shown(cap):
+            def cut(pg):
+                if len(pg) <= cap:
+                    return pg
+                return [f"{len(pg)}개 장"] if cap == 1 else pg[:cap - 1] + [f"외 {len(pg) - (cap - 1)}개"]
+            return [(n, cut(pg)) for n, pg in items]
+
+        def heights(sh, per, uniform):   # 줄 간격을 줄여 칸에 맞춤. (절별 높이 목록, 줄 간격, 필요 높이)
+            maxp, pitch = max(len(pg) for _, pg in sh), 0.21
+            while True:
+                hs = [0.46 + pitch * (maxp if uniform else len(pg)) for _, pg in sh]
+                need = (per * hs[0] if uniform else sum(hs)) + (per - 1) * gap0
+                if need <= avail + 1e-6 or pitch <= 0.17:
+                    return hs, pitch, need
+                pitch -= 0.01
+
+        pick = None
+        for cap in (4, 3, 2, 1):   # 줄 수를 줄이기 전에 칸 수를 늘림
+            sh = shown(cap)
+            for cols in ((1, 2) if len(items) <= 5 else (2,)):
+                per = math.ceil(len(sh) / cols)
+                r = heights(sh, per, uniform=cols == 2)
+                if r[2] <= avail + 1e-6:
+                    pick = (sh, cols, per, r)
+                    break
+            if pick:
+                break
+        if not pick:
+            sh = shown(1)
+            per = math.ceil(len(sh) / 2)
+            pick = (sh, 2, per, heights(sh, per, True))
+        sh, cols, per, (hs, pitch, need) = pick
+        if need > avail + 1e-6:
+            _warn(s, f"목차가 칸을 넘침 ({need:.2f} in, 칸 {avail:.2f} in): 절을 합치거나 절 수를 줄임")
         x0s, w = ((0.75,), 6.6) if cols == 1 else ((0.75, 4.55), 3.6)
-        per = math.ceil(len(items) / cols)
-        top, bottom = 1.55, 6.75
-        hs = [0.42 + 0.22 * len(pages) for _, pages in items]
+        gap = max(gap0, min(0.3, (avail - need + (per - 1) * gap0) / max(per - 1, 1) if per > 1 else gap0))
         for c in range(cols):
-            chunk = list(enumerate(items))[c * per:(c + 1) * per]
-            need = sum(hs[i] for i, _ in chunk)
-            gap = min(0.35, max(0.12, (bottom - top - need) / max(len(chunk) - 1, 1)))
+            chunk = list(enumerate(sh))[c * per:(c + 1) * per]
             y = top
-            if need > bottom - top:
-                _warn(s, f"목차가 칸을 넘침 ({need:.2f} in, 칸 {bottom - top:.2f} in): 절을 합치거나 장 주제를 줄임")
-            for i, (name, pages) in chunk:
+            for r, (i, (name, pages)) in enumerate(chunk):
                 if _text_w(name, 14) > w - 0.7 or any(_text_w(pg, 9) > w - 0.7 for pg in pages):
                     _warn(s, f"목차 '{name}' 의 글이 칸보다 김: 절 이름과 장 주제를 짧게")
                 text(s, x0s[c], y, 0.6, 0.36, f"{i + 1:02d}", size=20, bold=True, color=ORANGE)
                 text(s, x0s[c] + 0.65, y, w - 0.65, 0.36, name, size=14, bold=True, color=BLACK)
                 for k, pg in enumerate(pages):
-                    text(s, x0s[c] + 0.67, y + 0.42 + 0.22 * k, w - 0.67, 0.2, pg, size=9, color=SLATE9)
+                    text(s, x0s[c] + 0.67, y + 0.44 + pitch * k, w - 0.67, 0.2, pg, size=9, color=SLATE9)
                 y += hs[i] + gap
-                box(s, x0s[c], y - gap / 2, w, 0.01, fill=GRAY_L) if i != chunk[-1][0] else None
+                if r < len(chunk) - 1:
+                    box(s, x0s[c], y - gap / 2, w, 0.01, fill=GRAY_L)   # 구분선: 두 열에서는 같은 높이
 
     def _end(self):
         return self._add("앤드페이지_다크네이비")

@@ -315,21 +315,23 @@ function ensurePython() {
 const MAC_FONTS = [path.join(os.homedir(), "Library", "Fonts"), "/Library/Fonts"];
 const hasFont = () => (WIN
   ? ["HKLM", "HKCU"].some((root) =>
-    run(`reg query "${root}\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /f "Noto Sans KR"`))
-  : MAC_FONTS.some((d) => fs.existsSync(d) && fs.readdirSync(d).some((f) => /^NotoSansKR/i.test(f))));
+    run(`reg query "${root}\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /f "Pretendard Bold"`))
+  : MAC_FONTS.some((d) => fs.existsSync(d) && fs.readdirSync(d).some((f) => /^Pretendard-Bold/i.test(f))));
 
-// 관리자 권한 없이 사용자 글꼴로 설치 (OFL)
+// 관리자 권한 없이 사용자 글꼴로 설치 (OFL): 보통과 굵게 두 파일
+const FONT_FILES = [["Pretendard-Regular.otf", "Pretendard Regular (TrueType)"], ["Pretendard-Bold.otf", "Pretendard Bold (TrueType)"]];
 function installFont() {
-  const file = "NotoSansKR-VF.ttf";
   const dir = WIN ? path.join(os.homedir(), "AppData", "Local", "Microsoft", "Windows", "Fonts") : MAC_FONTS[0];
   try {
     fs.mkdirSync(dir, { recursive: true });
-    fs.copyFileSync(path.join(SRC, "assets", "fonts", file), path.join(dir, file));
-    if (WIN) execSync(`reg add "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans KR (TrueType)" ` +
-             `/t REG_SZ /d "${path.join(dir, file)}" /f`, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
+    for (const [file, regName] of FONT_FILES) {
+      fs.copyFileSync(path.join(SRC, "assets", "fonts", file), path.join(dir, file));
+      if (WIN) execSync(`reg add "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "${regName}" ` +
+                        `/t REG_SZ /d "${path.join(dir, file)}" /f`, { stdio: "ignore" });
+    }
+    return null;
+  } catch (e) {
+    return e;   // 실패 원인을 알림에 적음
   }
 }
 
@@ -346,9 +348,12 @@ function renderer() {
 function checks() {
   ensurePython();
   if (!WIN && !MAC) return step("OS", false, "Windows, Mac 만 지원");
-  if (hasFont()) step("글꼴", true, "Noto Sans KR");
-  else if (installFont()) step("글꼴", true, "Noto Sans KR 설치 (안 보이면 다시 로그인)");
-  else step("글꼴", false, "Noto Sans KR 설치 실패");
+  if (hasFont()) step("글꼴", true, "Pretendard");
+  else {
+    const err = installFont();
+    if (!err) step("글꼴", true, "Pretendard 설치 (안 보이면 다시 로그인)");
+    else step("글꼴", false, `Pretendard 설치 실패 (${err.code || err.message}): assets/fonts 의 Pretendard-Regular.otf 와 Pretendard-Bold.otf 를 직접 설치`);
+  }
   renderer();
 }
 

@@ -106,7 +106,7 @@ def check(path):
     lex, seen = (load_lexicon(), set()) if os.path.exists(LEXICON) else ([], set())
     if not lex:
         warns.append(f"어휘 사전을 못 읽음: {LEXICON}")
-    all_lines, src_by = [], []
+    all_lines, src_by, dup_caps = [], [], set()
     for i, s in enumerate(prs.slides, 1):
         lines = [ln.strip(" •※-") for t in slide_texts(s) for ln in (ok(t) if ok else t).split("\n")
                  if ln.strip()]
@@ -118,6 +118,10 @@ def check(path):
                     warns.append(f"표지 제목 '{ln}' 에 제품이나 과제 이름이 없음: 받는 사람이 어느 문서인지 표지에서 알게")
         for ln in lines:
             cap = re.fullmatch(r"\[(?:표|그림) (?:#|\d+)\. (.+)\]", ln)
+            same = sum(1 for x in lines if re.fullmatch(r"\[(?:표|그림) (?:#|\d+)\. " + re.escape(cap.group(1)) + r"\]", x)) if cap else 0
+            if same > 1 and (i, cap.group(1)) not in dup_caps:
+                dup_caps.add((i, cap.group(1)))
+                warns.append(f"{i}쪽 같은 제목 '[... {cap.group(1)}]' 이 한 장에 두 번: 그림 제목이 겹침 (구성도 장 figure= 와 mermaid title= 중 하나만)")
             if cap and cap.group(1) in lines:
                 warns.append(f"{i}쪽 '{cap.group(1)}' 가 패널 제목과 표 제목에 두 번 나옴: 한쪽을 다른 말로")
             for m in re.finditer(r"[A-Za-z]{3,}[가-힣]{2,}", ln) if len(ln) <= 30 else ():
