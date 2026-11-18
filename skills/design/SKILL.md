@@ -36,6 +36,8 @@ description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구�
 - 설계 문서는 사용자 흐름, 처리 순서(시퀀스), 배치도, 흐름 방식, 내부 구조 순으로 장을 짜고 고른 방식과 이유를 한 줄씩 적음: `references/아키텍처_설계_순서.md`
 - 구성도는 한 그림에 한 질문만 답하고, 포함 관계(제품 이름이 하위 기능을 감쌈), 값의 원천과 도착, 화살표 뜻, 기능 색 구분이 보이게 함: `references/구성도_읽힘_규칙.md`, 출발점 `scripts/example_diagram.py`
 - DocGrid: `header=` 를 쓰면 `area=True`, 기능 묶음마다 `tone="collect|send|manage|store|report"`, 처리 상자는 `flow="process"` (원천은 `"source"`, 도착은 `"sink"`), 기능 색 범례 `legend(..., kind="square")`
+- 구성도 종류를 사용자가 정하지 않았으면 AskUserQuestion 으로 묻기 (계층형 가로 띠, 구역 배치도, 토폴로지, 등각, 기능별 배치도, 번호 표기 방식): `references/구성도_종류_고르기.md`, 출발점 `scripts/example_architecture.py`. 부품 `layer_bands`, `bus_line`, `zone_box`, `tier_spec`, `node`, `iso_plate`, `iso_box`
+- 번호는 선 위에 얹히고 글이 바로 붙음 (`link(step=(번호, 글))`): 선 위에 못 놓으면 주의, 번호 대신 `text=` 선 이름. 상자 이름은 '대상 + 동작', 대상 없는 이름(수집 계획 제공)은 주의, 줄일 수 없으면 `abbr_legend` 로 풀이
 - 글꼴은 Pretendard 로 고정
 
 ## 1. 구성도 장 (`d.page(..., doc=True)`)

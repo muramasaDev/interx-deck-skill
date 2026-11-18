@@ -29,6 +29,7 @@ Claude Code 에서 말로 요청
 | `/ixdeck:report` | 보고 자료, 고객 보고, 주간보고 | "○○ 결과 보고 덱 만들어 줘" |
 | `/ixdeck:design` | 설계 문서, 구성도 | "수집 흐름 구성도 그려 줘" |
 | `/ixdeck:okr` | 월간 Individual OKR | "이번 달 OKR 써 줘" (지난달 덱 함께 전달) |
+| `/ixdeck:spec` | AI 학습데이터 명세서 HTML 양식 채우기와 점검 | "학습데이터 명세서 작성해줘" |
 | `/ixdeck:sheet` | xlsx 정의서 (테이블, API, 기능 항목, 화면, 추적 매트릭스) | "API 정의서 xlsx 로 만들어 줘" |
 | `/ixdeck:using` | 어느 명령을 쓸지 모를 때 | |
 

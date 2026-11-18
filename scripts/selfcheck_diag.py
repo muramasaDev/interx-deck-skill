@@ -131,4 +131,35 @@ with zipfile.ZipFile(out) as zi, zipfile.ZipFile(_bad_font, "w", zipfile.ZIP_DEF
 _run = lambda f: subprocess.run([sys.executable, "-P", os.path.join(_here, "check.py"), f], capture_output=True,
                                 env={**os.environ, "PYTHONIOENCODING": "utf-8"}).stdout.decode("utf8", "replace")
 assert "Pretendard 아닌 글꼴" in _run(_bad_font) and "Pretendard 아닌 글꼴" not in _run(out), "글꼴 검사"
+
+# 새 구성도 부품: 계층 띠, 구역, 사양 표, 노드, 등각, 모호한 이름, 선 위 번호
+from ixdeck import layer_bands, bus_line, zone_box, tier_spec, node, iso_plate, iso_box, abbr_legend, role_box  # noqa: E402
+_dn = Deck(author="AX Development / 시험 연구원", purpose="문서")
+_dn.cover("Sample System 설계서", "2026.11.18")
+_dn.section("구성")
+sn = _dn.page("부품", lead="요약 문장", doc=True, figure="시험 부품")
+_b = layer_bands(sn, 0.75, 2.3, 11.8, [("계층 A", 0.9, ["부제"]), ("계층 B", 0.9, None)])
+assert len(_b["rows"]) == 2 and _b["x1"] < 12.55
+try:
+    layer_bands(sn, 0.75, 2.3, 11.8, [("하나", 1.0, None)])
+    raise AssertionError("계층 하나")
+except ValueError:
+    pass
+try:
+    zone_box(sn, 1, 1, 1, 1, "x", kind="없는종류")
+    raise AssertionError("zone kind")
+except ValueError:
+    pass
+try:
+    iso_plate(sn, 1, 1, 1, 1, "x", tone="없는색")
+    raise AssertionError("iso tone")
+except ValueError:
+    pass
+_a = role_box(sn, 2.0, 2.45, 1.8, 0.4, "수집 계획 제공", role="base", flow="process")
+_c = role_box(sn, 6.0, 2.45, 1.8, 0.4, "수집 항목 및 주기 제공", role="base", flow="sink")
+link(sn, _a, _c, color=GRAY, step=(1, "전달"), cond="실패 시")   # 조건 글이 붙은 번호도 저장됨
+assert any("'수집 계획 제공' 이 모호함" in m for m in diagram_notes(sn)), diagram_notes(sn)
+assert not any("'수집 항목 및 주기 제공' 이 모호함" in m for m in diagram_notes(sn))
+abbr_legend(sn, 0.75, 5.0, 11.8, abbrs=[("수집 계획", "수집 항목과 주기를 적은 설정")])
+assert not any("모호" in m for m in diagram_notes(sn)), diagram_notes(sn)   # 풀이하면 주의에서 빠짐
 print("selfcheck_diag OK")

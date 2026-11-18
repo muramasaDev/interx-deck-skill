@@ -593,15 +593,24 @@ def tag(s, x, y, t="EAC", fill=GREEN):
     return t_
 
 
-def step(s, x, y, n, label=None, color=ACCENT, label_w=None, label_color=BLACK):
-    """번호 원 (0.15 in) 과 오른쪽 설명"""
-    c = num_badge(s, x, y, n, color, d=NUM_D_LINE, size=NUM_PT_LINE)
+def step(s, x, y, n, label=None, color=ACCENT, label_w=None, label_color=BLACK, on_line=None, owner=0, cond=None, cw=0):
+    """번호 원 (0.15 in) 과 오른쪽 설명. on_line: 'v' 세로선 위(글은 원 오른쪽), 'hb' 가로선 위에 원만 얹고 글은 원 위쪽에 붙임.
+    선 위에서는 원에 흰 테두리 (글 바탕은 칠하지 않음: 색 바탕 위에서 흰 상자가 보임)"""
     if label_w is None:
         label_w = _text_w(label or "", 7.26) + 0.12
-    if label:
-        text(s, x + 0.19, y - 0.03, label_w, 0.22, label, size=7.26, bold=True, color=label_color, anchor="m")
-        _reg(s).setdefault("rows", []).append((x, x + 0.19 + label_w, y + 0.075))
-    _reg(s)["obst"].append(((x, y - 0.03, x + 0.19 + (label_w if label else 0), y + 0.19), 0))
+    c = num_badge(s, x, y, n, color, d=NUM_D_LINE, size=NUM_PT_LINE, line=WHITE if on_line else None)
+    if on_line == "hb":
+        if label:
+            text(s, x, y - 0.17, label_w, 0.16, label, size=7.26, bold=True, color=label_color, anchor="b")
+        bb = (x, y - 0.17, x + max(0.15, label_w), y + 0.15)
+        if cond:
+            text(s, x + 0.19, y + 0.17, cw, 0.15, cond, size=6.35, bold=True, color=RED, align="l")   # 이 함수의 label 은 글 인자라 label() 을 못 씀
+    else:
+        if label:
+            text(s, x + 0.19, y - 0.03, label_w, 0.22, label, size=7.26, bold=True, color=label_color, anchor="m")
+            _reg(s).setdefault("rows", []).append((x, x + 0.19 + label_w, y + 0.075))
+        bb = (x, y - 0.03, x + 0.19 + (label_w if label else 0), y + 0.19)
+    _reg(s)["obst"].append((bb, owner))   # owner: 번호가 얹힌 선의 시작 상자 (자기 선은 지나도 됨)
     return c
 
 
@@ -2377,6 +2386,25 @@ def _line_spots(pts, w, h, gap=0.05):
                     yield xx, my - h / 2
 
 
+def _on_line_spots(pts, w, h):
+    """번호 원을 선 위에 얹는 자리 (x, y, 방향, 차지하는 네모). 세로 구간은 'v' (원이 선 위, 글은 원 오른쪽), 가로 구간은 'hb' (원만 선 위,
+    글은 원 위쪽). 긴 구간 가운데부터. 원 가운데가 선 위에 오도록 y 는 선보다 0.105 위. h 가 0.22 보다 크면 아래 조건 글 자리"""
+    segs = sorted(zip(pts, pts[1:]), key=lambda pq: -(abs(pq[1][0] - pq[0][0]) + abs(pq[1][1] - pq[0][1])))
+    full, short = [], []
+    for p, q in segs:
+        horiz = abs(p[1] - q[1]) < 1e-9
+        ln = abs(q[0] - p[0]) if horiz else abs(q[1] - p[1])
+        for t in (0.5, 0.35, 0.65, 0.22, 0.78):
+            mx, my = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+            if not horiz and ln >= h + 0.1:
+                full.append((mx - 0.075, my - 0.105, "v", (mx - 0.075, my - 0.105, mx - 0.075 + w, my - 0.105 + h)))
+            if horiz and ln >= max(w - 0.19, 0.19) + 0.2:
+                bx = mx - (w - 0.19) / 2
+                short.append((bx, my - 0.075, "hb", (bx, my - 0.245, bx + max(0.15, w - 0.19), my + 0.075 + max(0, h - 0.22))))
+    yield from full
+    yield from short
+
+
 def _box_spots(sh, w, h):
     x0, y0, x1, y1 = _bb(sh)
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -2456,6 +2484,10 @@ def _number_captions(slides):
                     r.text = re.sub(rf"^\[{k} (#|\d+)\. ", f"[{k} {n[k]}. ", r.text)
 
 
+_VAGUE = re.compile(r"^(?:(?:수집|전송|처리|관리|분석|저장|보고|운영|제어|연계) )?(계획|정보|데이터|자료|값|내용|설정|기능|서비스|모듈|결과)"
+                    r"(?: (?:제공|전달|처리|관리|연계|확인|조회|생성|보관|전송|수신|송신|저장))?$")   # 앞말이 행위이거나 없고 대상(무슨 계획인지)이 빠진 이름
+
+
 def diagram_notes(s):
     """구성도 문법 주의: 선 색은 의미 셋까지 (데이터 흐름, 제어 흐름, 굵은 공통 버스, 빨강 끊김은 별도), 아이콘은 한 세트"""
     out = []
@@ -2474,6 +2506,11 @@ def diagram_notes(s):
             outs[b_], ins[a_] = outs.get(b_, 0) + 1, ins.get(a_, 0) + 1
     for a_, b_ in _reg(s).get("bidir", ()):
         outs[b_], ins[a_] = outs.get(b_, 0) + 1, ins.get(a_, 0) + 1
+    terms = _reg(s).get("terms", set())   # 이름이 모호한 상자: 처음 보는 사람이 '무슨 계획?' 하고 묻게 되는 이름 (대상이 빠진 것)
+    for name in dict.fromkeys(n_ for _, n_ in list(_reg(s).get("grid_boxes", ())) + list(_reg(s).get("box_names", ()))):
+        if _VAGUE.match(name) and not any(k in name for k in terms):
+            out.append(f"상자 이름 '{name}' 이 모호함: 무슨 {_VAGUE.match(name).group(1)} 인지 처음 보는 사람이 모름. '대상 + 동작' 으로 구체화 "
+                       "(예: 수집 항목 및 주기 제공) 하거나 abbr_legend 로 용어를 풀이")
     for sid, (role, name) in _reg(s).get("flow_roles", {}).items():
         i_, o_ = ins.get(sid, 0), outs.get(sid, 0)
         if role == "process" and not (i_ and o_):
@@ -2621,8 +2658,19 @@ def _flush(s):
             pts, a, b = where
             return itertools.chain(((sp, True) for sp in _line_spots(pts, w, h)),
                                    ((sp, False) for sp in _line_spots(pts, w, h)))
-        spot = None
-        if kind != "boxstep":
+        spot, on_line = None, None
+        if kind == "step":   # 번호 원은 선 위에 얹어 어느 선의 번호인지 바로 보이게 (자기 선은 비켜 가지 않고 나머지만 피함)
+            others = [sg for sg in R["segs"] if sg not in set(zip(where[0], where[0][1:]))]
+            r2 = {**R, "segs": others}
+            cands = list(_on_line_spots(where[0], w, h))
+            for walls in (True, False, None):   # None: 묶음 테두리는 따지지 않음 (선 위이므로 어느 선의 번호인지가 먼저)
+                hit = next((c for c in cands if _free({**r2, "walls": []} if walls is None else r2, c[3], bool(walls))), None)
+                if hit:
+                    spot, on_line = (hit[0], hit[1]), hit[2]
+                    break
+            if spot is None:
+                _notice(s, f"번호 {n} '{t}' 를 선 위에 놓을 자리가 없어 선 옆에 둠 (선이 짧거나 주변이 막힘): 어느 선의 번호인지 흐려지므로 번호 대신 선 이름(text=)을 쓰거나 상자 사이를 넓힘")
+        if spot is None and kind != "boxstep":
             spot = next((sp for sp in _line_spots(where[0], w, h) if _free(R, (sp[0], sp[1], sp[0] + w, sp[1] + h), True)),
                         None)
             if spot is None:
@@ -2649,8 +2697,10 @@ def _flush(s):
             _warn(s, f"'{t}' 를 놓을 빈 자리가 없어 겹치게 둠")
         x, y = spot
         if is_step:
-            step(s, x, y + 0.03, n, t, color=color, label_w=lw)
-            if cond:
+            step(s, x, y + (0 if on_line == "hb" else 0.03), n, t, color=color, label_w=lw, on_line=on_line,
+                 owner=where[1].shape_id if on_line else 0, cond=cond if on_line == "hb" else None, cw=cw)
+
+            if cond and on_line != "hb":
                 label(s, x + 0.19, y + 0.22, cw, cond, color=RED, align="l")
         else:
             label(s, x, y, lw, t, color=color, bold=True)

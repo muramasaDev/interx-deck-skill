@@ -23,6 +23,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | 보고 자료, 결과 보고, 과제 개요, 수행계획, 착수 보고, 고객 보고, 주간보고, 성능 비교, 화면 설명 | `ixdeck:report` |
 | 설계 문서, 시스템 구성도, 아키텍처도, 데이터 흐름도, AAS 구조도, 다른 양식 문서(PM03 등)의 본문 장 | `ixdeck:design` |
 | 월간 Individual OKR 덱 (IX_OKR_Individual_OKR) | `ixdeck:okr` (전월 덱을 틀로 쓰는 다른 엔진. 아래 2 ~ 6절 대신 그 스킬의 규칙) |
+| AI 학습데이터 명세서 (M.AX 얼라이언스 HTML 양식, 작성용 및 취합용) | `ixdeck:spec` (엔진 `ixspec.py`, 점검 및 브라우저 저장본 비교 `spec_verify.py`) |
 | 정의서 xlsx (테이블, API, 개발 기능 항목, 화면 정의서, 추적 매트릭스) | `ixdeck:sheet` (엔진 `ixsheet.py`, 검사 `sheet_check.py`, 그림 `xlsx_view.py`) |
 - 한 덱에 보고형 장과 구성도 장이 섞이면 report 와 design 을 같이 읽는다 (엔진, 관문이 같음)
 
