@@ -392,22 +392,23 @@ def _notes_h(lines, w, size):
     return max(0.15, size * 1.3 / 72) * n + 0.05
 
 
-def big_arrow(s, x, y, w=0.38, h=0.33, direction="right"):
-    """패널 사이 회색 큰 화살표"""
+def big_arrow(s, x, y, w=0.38, h=0.33, direction="right", colors=None, adj=(0.48473, 0.52219)):
+    """패널 사이 회색 큰 화살표. colors=(꼬리 색, 머리 색) 이면 그 두 색의 그라데이션"""
     rot = {"right": 0, "down": 90, "left": 180, "up": 270}[direction]
     sh = s.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(x), Inches(y), Inches(w), Inches(h))
     _no_style_effects(sh)
-    _adj(sh, 0.48473, 0.52219)
+    _adj(sh, *adj)
     sh.rotation = rot
     sppr = sh._element.spPr
     for el in sppr.findall(qn("a:solidFill")):
         sppr.remove(el)
-    grad = etree.fromstring(
-        f'<a:gradFill xmlns:a="{_A}" flip="none" rotWithShape="1"><a:gsLst>'
+    stops, ang = (f'<a:gs pos="0"><a:srgbClr val="{colors[0]}"/></a:gs><a:gs pos="100000"><a:srgbClr val="{colors[1]}"/></a:gs>',
+                  0) if colors else (
         '<a:gs pos="0"><a:schemeClr val="bg1"><a:lumMod val="50000"/></a:schemeClr></a:gs>'
         '<a:gs pos="50000"><a:schemeClr val="bg1"><a:lumMod val="75000"/></a:schemeClr></a:gs>'
-        '<a:gs pos="100000"><a:schemeClr val="bg1"><a:lumMod val="95000"/></a:schemeClr></a:gs>'
-        '</a:gsLst><a:lin ang="10800000" scaled="1"/></a:gradFill>')
+        '<a:gs pos="100000"><a:schemeClr val="bg1"><a:lumMod val="95000"/></a:schemeClr></a:gs>', 10800000)
+    grad = etree.fromstring(f'<a:gradFill xmlns:a="{_A}" flip="none" rotWithShape="1"><a:gsLst>{stops}</a:gsLst>'
+                            f'<a:lin ang="{ang}" scaled="1"/></a:gradFill>')
     geom = sppr.find(qn("a:prstGeom"))
     geom.addnext(grad)
     _line(sh, None)
@@ -445,7 +446,7 @@ def table_caption(s, x, y, w, title, unit=None, rows=None, key=None):
         u = text(s, x + w - uw, y, uw, 0.2, f"(단위: {unit})", size=6.35, color=SLATE9, align="r")
         u.name = "IXUNIT"
         _obst(s, u)
-    elif rows and "단위" not in rows[0] and sum(bool(_NUM_CELL.match(str(c).strip())) and not _YEAR.match(str(c).strip())
+    elif rows and not any("단위" in str(h) for h in rows[0]) and sum(bool(_NUM_CELL.match(str(c).strip())) and not _YEAR.match(str(c).strip())
                                                for r in rows[1:] for c in r[1:]) >= 2:   # 첫 열 제외, 단위 열이 있으면 통과
         _warn(s, f"숫자 표 '{title}' 에 단위 없음: unit='건, %' (표 오른쪽 위에 (단위: ...))")
 
@@ -858,8 +859,9 @@ def _default_mpl(path):
     """matplotlib 기본 주황, 파랑 칸이 그림의 0.5% 넘음"""
     from PIL import Image as _Im
     with _Im.open(path) as im:
-        px = im.convert("RGB").resize((200, 200), _Im.NEAREST).getdata()
-    hits = sum(1 for p in px if p in ((255, 127, 14), (31, 119, 180)))
+        raw = im.convert("RGB").resize((200, 200), _Im.NEAREST).tobytes()   # getdata 는 Pillow 14 에서 없어짐
+    px = [raw[i:i + 3] for i in range(0, len(raw), 3)]
+    hits = sum(1 for p in px if p in (bytes((255, 127, 14)), bytes((31, 119, 180))))
     return hits > len(px) * 0.005
 
 

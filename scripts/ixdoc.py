@@ -8,11 +8,6 @@ import re
 from ixdeck import BLACK, CAP_H, GRAY_L, NUM_D, Col, Deck, _lh, _nl, box, num_badge, report_panels, table, table_caption, text
 
 TS = 8.0   # 설계 문서 표 글자 (보고 표 7.26 보다 큼)
-IO_HEAD = ["항목", "방향", "형식", "필수", "설명"]
-LIMIT_HEAD = ["항목", "값", "단위", "비고"]
-ERR_HEAD = ["코드", "조건", "화면 문구 및 처리"]
-ELEM_HEAD = ["번호", "요소", "동작", "검증 및 표시"]
-REF_HEAD = ["구분", "번호"]
 _PLAIN = re.compile(r"[가-힣]니다|(한다|된다|이다|했다|하였다)(\.|$)")   # 서술체 검사에 걸리는 화면 문구만 예외로 등록
 _CODE = re.compile(r"^(\d{3}|[A-Z][A-Z0-9_-]{2,})$")
 
@@ -26,7 +21,8 @@ def _table(self, head, rows, ratio, title, unit, align, hl=(), row_h=0.27):
         if len(r) != len(head) or any(c is None or not str(c).strip() for c in r):
             raise ValueError(f"표 행은 {head} 칸을 모두 채움 (없으면 -): {r}")
     cw = [self.w * k / sum(ratio) for k in ratio]
-    hs = [max(row_h, max(_nl(str(c), cw[j] - 0.12, TS) for j, c in enumerate(r)) * _lh(TS) + 0.07) for r in rows]
+    wide = lambda j: 1.12 if j in hl else 1.0   # 남색 굵은 글씨 열은 글자가 더 넓음
+    hs = [max(row_h, max(_nl(str(c), (cw[j] - 0.12) / wide(j), TS) for j, c in enumerate(r)) * _lh(TS) + 0.07) for r in rows]
     head_h = min(row_h, 0.27)
 
     def draw(y, r):
@@ -41,12 +37,12 @@ def field_table(self, rows, title="입출력 항목", unit=None, row_h=0.27):
     for r in rows:
         if len(r) != 5 or r[1] not in ("입력", "출력") or r[3] not in ("필수", "선택", "-"):
             raise ValueError(f"field_table 행은 (항목, 입력 또는 출력, 형식, 필수 또는 선택 또는 -, 설명): {r}")
-    return _table(self, IO_HEAD, rows, [1.5, 0.55, 0.8, 0.55, 2.4], title, unit, ["l", "c", "c", "c", "l"], row_h=row_h)
+    return _table(self, ["항목", "방향", "형식", "필수", "설명"], rows, [1.5, 0.55, 0.8, 0.55, 2.4], title, unit, ["l", "c", "c", "c", "l"], row_h=row_h)
 
 
 def limit_table(self, rows, title="한계 값", unit=None, row_h=0.27):
     """rows=[(항목, 값, 단위, 비고)]. 값 열은 남색 굵은 글씨 (한계값이 일반 글에 묻히지 않게)"""
-    return _table(self, LIMIT_HEAD, rows, [1.7, 1.35, 0.65, 1.8], title, unit, ["l", "r", "c", "l"], hl=(1,), row_h=row_h)
+    return _table(self, ["항목", "값", "단위", "비고"], rows, [1.7, 1.35, 0.65, 1.8], title, unit, ["l", "r", "c", "l"], hl=(1,), row_h=row_h)
 
 
 def error_table(self, rows, title="오류 코드", unit=None, row_h=0.27):
@@ -54,7 +50,7 @@ def error_table(self, rows, title="오류 코드", unit=None, row_h=0.27):
     for r in rows:
         if len(r) != 3 or not _CODE.match(str(r[0])):
             raise ValueError(f"error_table 행은 (코드, 조건, 화면 문구 및 처리), 코드는 400 또는 E_AUTH 꼴: {r}")
-    return _table(self, ERR_HEAD, rows, [0.6, 1.8, 2.2], title, unit, ["c", "l", "l"], hl=(0,), row_h=row_h)
+    return _table(self, ["코드", "조건", "화면 문구 및 처리"], rows, [0.6, 1.8, 2.2], title, unit, ["c", "l", "l"], hl=(0,), row_h=row_h)
 
 
 def element_table(self, rows, title="화면 요소", unit=None, row_h=0.27):
@@ -62,14 +58,14 @@ def element_table(self, rows, title="화면 요소", unit=None, row_h=0.27):
     for r in rows:
         if len(r) != 4 or not str(r[0]).isdigit():
             raise ValueError(f"element_table 행은 (번호, 요소, 동작, 검증 및 표시), 번호는 숫자: {r}")
-    return _table(self, ELEM_HEAD, rows, [0.55, 1.1, 1.8, 1.7], title, unit, ["c", "l", "l", "l"], hl=(0,), row_h=row_h)
+    return _table(self, ["번호", "요소", "동작", "검증 및 표시"], rows, [0.55, 1.1, 1.8, 1.7], title, unit, ["c", "l", "l", "l"], hl=(0,), row_h=row_h)
 
 
 def ref_table(self, refs, title="관련 번호", unit=None, row_h=0.27):
     """refs={구분: 번호 글}. 예: {"기능": "F-001 ~ 003", "화면": "SCR-02"}"""
     if not refs:
         raise ValueError("ref_table 이 비었음")
-    return _table(self, REF_HEAD, list(refs.items()), [0.8, 3.0], title, unit, ["l", "l"], row_h=row_h)
+    return _table(self, ["구분", "번호"], list(refs.items()), [0.8, 3.0], title, unit, ["l", "l"], row_h=row_h)
 
 
 def flow(self, steps, row_h=0.27):
@@ -81,7 +77,7 @@ def flow(self, steps, row_h=0.27):
 
     def draw(y, r):
         yy, tops = y, []
-        for n, (t, h) in enumerate(zip(steps, hs), 1):
+        for t, h in zip(steps, hs):
             tops.append(yy + (h - NUM_D) / 2)
             text(self.s, self.x + NUM_D + 0.12, yy, w, h, t, size=TS, color=BLACK, align="l")
             yy += h + gap

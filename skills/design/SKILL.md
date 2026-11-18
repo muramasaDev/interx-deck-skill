@@ -29,7 +29,7 @@ description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구�
 - 한계 값은 글 목록이 아니라 `limit_table` (값 열은 남색 굵은 글씨), 입출력은 `field_table`, 오류는 `error_table` (코드는 3자리 숫자 또는 대문자 식별자), 화면 요소는 `element_table` (번호가 캡처의 번호 원과 같아야 하고 어긋나면 오류), 관련 번호는 `ref_table`, 처리 순서는 `flow`
 - 표 칸이 줄 바꿈되면 그 행만 높아짐. 칸이 비면 오류 (없으면 `-`)
 - 같은 틀이 연달아 나오지 않게: 구역이 다른 기능끼리 묶고, 흐름이 핵심인 기능은 `chevrons` 를 쓴 장으로 따로 만듦
-- 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`)
+- 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`, 단계형 장 `step_header` 와 `summary_bar`, 말풍선 `speech_bubble`)
 
 ## 1. 구성도 장 (`d.page(..., doc=True)`)
 ```python

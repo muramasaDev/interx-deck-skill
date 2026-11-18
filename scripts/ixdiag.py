@@ -3,10 +3,10 @@
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Inches, Pt
 
-from ixdeck import (_A, BLACK, GREEN, NAVY, SLATE3, SLATE6, WHITE, _adj, _lh, _line, _no_style_effects, _obst, _text_w,
-                    box, etree, qn, text)
+from ixdeck import (BLACK, GRAY_L, GREEN, NAVY, SLATE0, SLATE3, SLATE6, WHITE, _adj, _fill, _lh, _line,
+                    _no_style_effects, _obst, _reg, _set_text, _text_w, big_arrow, box, text)
 
-__all__ = ["AMBER", "ROLE", "role_box", "block_arrow", "pill", "abbr_legend"]
+__all__ = ["AMBER", "ROLE", "role_box", "block_arrow", "pill", "abbr_legend", "step_header", "summary_bar", "speech_bubble"]
 
 AMBER = "FFC000"
 ROLE = {"base": (SLATE6, WHITE), "ai": (GREEN, WHITE), "ext": (AMBER, BLACK), "platform": (NAVY, WHITE)}   # 칩 색의 뜻 (바탕, 글자)
@@ -26,29 +26,16 @@ def role_box(s, x, y, w, h, t, role="base", sub=None, size=7.26):
 
 def block_arrow(s, x, y, w, h, label=None, direction="right"):
     """큰 흐름용 그라데이션 블록 화살표 (꼬리는 옅고 머리는 짙음). label: 가로면 위, 세로면 오른쪽에 굵은 글"""
-    rot = {"right": 0, "down": 90, "left": 180, "up": 270}[direction]
-    ow, oh = (h, w) if rot in (90, 270) else (w, h)   # 세로는 돌리기 전 틀을 맞바꿔 (x, y, w, h) 가 보이는 크기가 되게
-    sh = s.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(x + (w - ow) / 2), Inches(y + (h - oh) / 2), Inches(ow),
-                            Inches(oh))
-    _no_style_effects(sh)
-    _adj(sh, 0.5, 0.6)
-    sh.rotation = rot
-    sppr = sh._element.spPr
-    for el in sppr.findall(qn("a:solidFill")):
-        sppr.remove(el)
-    sppr.find(qn("a:prstGeom")).addnext(etree.fromstring(
-        f'<a:gradFill xmlns:a="{_A}" flip="none" rotWithShape="1"><a:gsLst>'
-        f'<a:gs pos="0"><a:srgbClr val="{SLATE3}"/></a:gs><a:gs pos="100000"><a:srgbClr val="{SLATE6}"/></a:gs>'
-        '</a:gsLst><a:lin ang="0" scaled="1"/></a:gradFill>'))
-    _line(sh, None)
+    ow, oh = (h, w) if direction in ("down", "up") else (w, h)   # 세로는 돌리기 전 틀을 맞바꿔 (x, y, w, h) 가 보이는 크기가 되게
+    sh = big_arrow(s, x + (w - ow) / 2, y + (h - oh) / 2, ow, oh, direction, colors=(SLATE3, SLATE6), adj=(0.5, 0.6))
     if label:
         lines = label if isinstance(label, list) else [label]
         th = len(lines) * _lh(8) + 0.04
         if direction in ("right", "left"):
-            text(s, x, y - th - 0.02, w, th, lines, size=8, bold=True, align="c", anchor="b")
+            _obst(s, text(s, x, y - th - 0.02, w, th, lines, size=8, bold=True, align="c", anchor="b"))
         else:
-            text(s, x + w + 0.08, y + (h - th) / 2, 2.2, th, lines, size=8, bold=True, align="l")
-    return sh
+            _obst(s, text(s, x + w + 0.08, y + (h - th) / 2, 2.2, th, lines, size=8, bold=True, align="l"))
+    return _obst(s, sh)
 
 
 def pill(s, x, y, t, color=GREEN, size=5.44):
@@ -65,11 +52,52 @@ def abbr_legend(s, x, y, w, bullets=(), abbrs=()):
     h = n * _lh(8) + 0.04
     lw = w * 0.62
     if bullets:
-        text(s, x, y, lw, h, ["- " + b for b in bullets], size=8, color=BLACK, align="l", anchor="t")
+        _obst(s, text(s, x, y, lw, h, ["- " + b for b in bullets], size=8, color=BLACK, align="l", anchor="t"))
     if abbrs:
-        text(s, x + lw, y, w - lw, h, [f"{k} : {v}" for k, v in abbrs], size=8, bold=True, color=BLACK, align="r",
-             anchor="t")
+        _obst(s, text(s, x + lw, y, w - lw, h, [f"{k} : {v}" for k, v in abbrs], size=8, bold=True, color=BLACK,
+                      align="r", anchor="t"))
     return y + h
+
+
+def step_header(s, x, y, w, items, h=0.42):
+    """단계형 장의 머리띠: 남색 쉐브론이 가로로 이어지고 단계마다 하나. items=[글].
+    아래 열을 같은 폭에 맞추도록 [(열 x, 열 너비)] 를 돌려줌"""
+    n, gap, tip = len(items), 0.06, 0.18
+    if n < 2:
+        raise ValueError("step_header 는 두 단계 이상")
+    wc = (w - tip - gap * (n - 1)) / n
+    cols = [(x + i * (wc + gap), wc) for i in range(n)]
+    for i, (t, (cx, _)) in enumerate(zip(items, cols)):
+        box(s, cx, y, wc + tip, h, t, fill=NAVY, size=10.5, bold=True, color=WHITE,
+            geom="homePlate" if i == 0 else "chevron", inset=(0.1 if i == 0 else 0.22, 0, 0.14, 0))
+    _reg(s)["obst"].append(((x, y, x + w, y + h), 0))   # 쉐브론끼리 일부러 겹치므로 띠 하나로 등록
+    return cols
+
+
+def summary_bar(s, cols, lines, y, h=0.7):
+    """단계 머리띠 아래 둥근 요약바: 열마다 한 줄씩(앞에 '• '), 열 폭에 맞춤. cols 는 step_header 의 결과. 아래 y 를 돌려줌"""
+    if len(lines) != len(cols):
+        raise ValueError(f"summary_bar 줄 {len(lines)}개와 열 {len(cols)}개가 다름")
+    x0, x1 = cols[0][0], cols[-1][0] + cols[-1][1]
+    _obst(s, box(s, x0, y, x1 - x0 + 0.18, h, fill=SLATE0, line=GRAY_L, lw=0.75, geom="round", radius=0.12))
+    for (cx, cw), t in zip(cols, lines):
+        text(s, cx + 0.1, y, cw - 0.1, h, "• " + t, size=9, bold=True, color=BLACK, align="l")
+    return y + h
+
+
+def speech_bubble(s, x, y, w, h, t, tail="left"):
+    """말풍선: 현업 말투 한두 문장 (이모지는 쓰지 않음). tail: left, right, down"""
+    out = 0.32   # 꼬리 끝이 상자 밖으로 나오는 길이 (in)
+    pos = {"left": (-0.5 - out / w, 0.25), "right": (0.5 + out / w, 0.25), "down": (-0.25, 0.5 + out / h)}
+    if tail not in pos:
+        raise ValueError(f"speech_bubble tail '{tail}' 은 {', '.join(pos)} 중 하나")
+    sh = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGULAR_CALLOUT, Inches(x), Inches(y), Inches(w), Inches(h))
+    _no_style_effects(sh)
+    _adj(sh, *pos[tail], 0.16667)
+    _fill(sh, WHITE)
+    _line(sh, SLATE6, 1.0)
+    _set_text(sh, t, 9, False, BLACK, "l", "m", (0.14, 0.06, 0.14, 0.06))
+    return _obst(s, sh)
 
 
 import ixdeck as _ixdeck  # noqa: E402  ixdiag 를 먼저 불러도 ixdeck 이름공간에 들어가게 (맨 아래에서 한 번 더)

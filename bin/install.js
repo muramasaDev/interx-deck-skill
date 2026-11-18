@@ -199,19 +199,20 @@ function ownedByUs(dir) {
 // plugin.json 이 없어야 두 폴더가 같은 플러그인 이름으로 겹치지 않음. 그 빌더를 고친 뒤 이 함수와 호출, 제거 줄을 지움
 function linkOld() {
   const stale = OLD + ".old";
+  if (!fs.existsSync(OLD)) return;   // 옛 설치가 없던 PC 에는 옛 경로로 엔진을 찾는 빌더도 없음
   try {
-    if (fs.existsSync(OLD)) {
-      if (!ownedByUs(OLD)) return step("옛 이름", true, `${OLD} 는 직접 둔 폴더라 그대로`);
-      fs.rmSync(stale, { recursive: true, force: true });
-      fs.renameSync(OLD, stale);   // 다른 프로그램이 잡고 있으면 여기서 멈추고 옛 폴더는 그대로 남음
-    }
+    if (!ownedByUs(OLD)) return step("옛 이름", true, `${OLD} 는 직접 둔 폴더라 그대로`);
+    fs.rmSync(stale, { recursive: true, force: true });
+    fs.renameSync(OLD, stale);   // 다른 프로그램이 잡고 있으면 여기서 멈추고 옛 폴더는 그대로 남음
     fs.mkdirSync(OLD, { recursive: true });
     fs.symlinkSync(path.join(DEST, "scripts"), path.join(OLD, "scripts"), "junction");
     fs.writeFileSync(path.join(OLD, MARK), "연결용 폴더\n");
     fs.rmSync(stale, { recursive: true, force: true });
     step("옛 이름", true, "interx-deck/scripts 연결을 둠 (잠시 유지)");
   } catch (e) {
-    if (!fs.existsSync(OLD) && fs.existsSync(stale)) fs.renameSync(stale, OLD);   // 실패하면 옛 폴더를 되돌림
+    try {
+      if (!fs.existsSync(OLD) && fs.existsSync(stale)) fs.renameSync(stale, OLD);   // 실패하면 옛 폴더를 되돌림
+    } catch { /* 되돌리지 못해도 설치는 계속 */ }
     step("옛 이름", false, `연결을 만들지 못함 (${e.code || e.message}): ${OLD} 를 쓰는 프로그램을 닫고 다시 실행`);
   }
 }

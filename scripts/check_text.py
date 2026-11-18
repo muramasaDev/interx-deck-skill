@@ -35,8 +35,7 @@ WARN = [
     (r"성숙도 ?(레벨|단계|수준)", "방법론 용어: Level 1 ~ 5 (모니터링, 제어, 최적화, 자율운영)"),
     (r"설정 ?변수|세팅 ?변수", "방법론 용어: 셋팅변수 (X3)"),
 ]
-JOSA = {"에서", "으로", "에게", "까지", "부터", "처럼", "보다", "이며", "이고", "이나", "에는", "에도", "로서", "로써", "에서는",
-        "으로는", "에서도", "으로도"}
+JOSA = ("에서", "으로", "에게", "까지", "부터", "처럼", "보다", "이며", "이고", "이나", "에는", "에도", "로서", "로써")
 # 조사, 어미로 끝나는 낱말 (명사 잇기 판단용)
 ENDS = re.compile(r"(은|는|이|가|을|를|의|에|에서|로|으로|와|과|도|만|까지|부터|보다|처럼|하여|하고|해서|하면|이면|고|며|면|서|지|게"
                   r"|음|함|임|됨|듦|및|등|중|후|전|별|당|용)$")
@@ -118,9 +117,12 @@ def check(path):
                 if re.fullmatch(r"(?:[가-힣]+ ){0,2}(설계서|정의서|보고서|계획서|제안서|명세서)", ln):
                     warns.append(f"표지 제목 '{ln}' 에 제품이나 과제 이름이 없음: 받는 사람이 어느 문서인지 표지에서 알게")
         for ln in lines:
-            m = re.search(r"[A-Za-z]{3,}[가-힣]{2,}", ln) if len(ln) <= 30 else None
-            if m and re.sub(r"^[A-Za-z]+", "", m.group()) not in JOSA:   # 에서, 으로 같은 두 글자 조사는 정상
-                warns.append(f"{i}쪽 '{m.group()}' 영문 뒤 한글을 붙여 씀: 띄어쓰기 ('{ln[:30]}')")
+            cap = re.fullmatch(r"\[(?:표|그림) (?:#|\d+)\. (.+)\]", ln)
+            if cap and cap.group(1) in lines:
+                warns.append(f"{i}쪽 '{cap.group(1)}' 가 패널 제목과 표 제목에 두 번 나옴: 한쪽을 다른 말로")
+            for m in re.finditer(r"[A-Za-z]{3,}[가-힣]{2,}", ln) if len(ln) <= 30 else ():
+                if not re.sub(r"^[A-Za-z]+", "", m.group()).startswith(JOSA):   # 에서, 에서의, 로서의 같은 조사로 시작하면 정상
+                    warns.append(f"{i}쪽 '{m.group()}' 영문 뒤 한글을 붙여 씀: 띄어쓰기 ('{ln[:30]}')")
         for ln in lines:
             for pat, why in FAIL:
                 m = re.search(pat, ln)

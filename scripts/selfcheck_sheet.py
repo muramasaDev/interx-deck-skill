@@ -32,7 +32,7 @@ assert ws["A4"].alignment.horizontal == "center" and ws["D4"].alignment.horizont
 assert ws["D4"].number_format == "#,##0" and ws["E4"].number_format == "#,##0.0"
 assert ws["B4"].alignment.horizontal == "left" and ws["B4"].alignment.wrap_text
 assert ws["G4"].number_format == "yyyy-mm-dd" and ws["H4"].fill.fgColor.rgb.endswith("FFF2CC")
-assert ws["A3"].fill.fgColor.rgb.endswith("002060") and ws["A3"].font.name == "맑은 고딕"
+assert ws["A3"].fill.fgColor.rgb.endswith("D9D9D9") and ws["A3"].font.name == "맑은 고딕"
 assert ws["H1"].value is None and wb["처리 현황"]["D1"].value == "(단위: 건)"
 assert ws.row_dimensions[6].height == row_height(line_count(ws["F6"].value, 50)) > 18
 assert wb["요구사항 추적"]["B3"].value == "●" and wb["요구사항 추적"]["C3"].value == "-"
@@ -183,4 +183,12 @@ _big = Book("시험", history=_h)
 _t0 = time.time()
 _big.table("큰 표", [Field("ID", "id"), Field("글", "text", 30), Field("수", "num")], [(f"R-{i}", "샘플", i) for i in range(3000)])
 assert time.time() - _t0 < 20, "3000행 표가 느림"
+# 하위 표: 상위 ID 를 되풀이해도 통과, (ID, 순번) 조합이 같으면 거부
+_ch = Book("시험", history=_h)
+_ch.table("필드", [Field("테이블 ID", "ref"), Field("순번", "num"), Field("컬럼", "text")],
+          [("T-1", 1, "a"), ("T-1", 2, "b"), ("T-2", 1, "c")])
+_cp = os.path.join(tmp, "child.xlsx")
+_ch.save(_cp)
+assert subprocess.run([sys.executable, "-P", os.path.join(HERE, "sheet_check.py"), _cp], capture_output=True).returncode == 0
+_bad(lambda: Book("시험", history=_h).table("필드", [Field("테이블 ID", "ref"), Field("순번", "num")], [("T-1", 1), ("T-1", 1)]), "하위 표 조합 중복")
 print("selfcheck_sheet OK")

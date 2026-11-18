@@ -180,9 +180,11 @@ def check_deck(pptx, want):
             os.remove(new)   # 실패한 덱에 예전 통과 기록을 남기지 않음
     else:   # 넘기기 전 gate.py --verify 가 이 기록과 대조
         os.makedirs(os.path.dirname(new), exist_ok=True)
-        for f in glob.glob(os.path.join(os.path.dirname(new), "*.json")):   # 없어진 덱의 기록은 치움
+        for f in glob.glob(os.path.join(os.path.dirname(new), "*.json")):   # 덱이 없고 30일 넘게 안 쓴 기록만 치움 (USB, 동기화 폴더 보호)
             try:
-                if not os.path.exists(json.load(open(f, encoding="utf8")).get("path", f)):
+                with open(f, encoding="utf8") as fh:
+                    gone = not os.path.exists(json.load(fh).get("path", f))
+                if gone and time.time() - os.path.getmtime(f) > 30 * 86400:
                     os.remove(f)
             except (OSError, ValueError):
                 pass

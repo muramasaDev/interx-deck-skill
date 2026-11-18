@@ -18,7 +18,7 @@ BW = {"thin": 1, "hair": 1, "medium": 2, "thick": 3, "double": 3}
 
 def rgb(color, default=None):
     v = getattr(color, "rgb", None)
-    return "#" + v[-6:] if isinstance(v, str) and len(v) in (6, 8) else default
+    return "#" + v[-6:] if isinstance(v, str) and re.fullmatch(r"[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", v) else default
 
 
 def px(width):
@@ -95,6 +95,9 @@ def main(argv):
     rows = 40
     if "--rows" in argv:
         i = argv.index("--rows")
+        if i + 1 >= len(argv) or not argv[i + 1].isdigit():
+            print(__doc__)
+            return 2
         rows = int(argv[i + 1])
         del argv[i:i + 2]
     if len(argv) != 2:

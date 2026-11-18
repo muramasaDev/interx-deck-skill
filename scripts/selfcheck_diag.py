@@ -32,8 +32,20 @@ except ValueError:
 import subprocess  # noqa: E402
 _here = os.path.dirname(os.path.abspath(__file__))
 assert subprocess.run([sys.executable, "-P", "-c", "import sys; sys.path.insert(0, %r); import ixdiag, ixdeck; assert hasattr(ixdeck, 'role_box')" % _here]).returncode == 0, "ixdiag 먼저 import"
-_v = block_arrow(s, 1, 1, 0.4, 2.0, direction="down")   # 세로: (x, y, w, h) 가 보이는 크기
+s2 = d.page("단계 부품", lead="요약 문장", doc=True, figure="시험 단계")
+cols = step_header(s2, 0.6, 2.0, 8.0, ["가", "나", "다"])
+assert len(cols) == 3 and cols[1][0] > cols[0][0] + cols[0][1]
+assert summary_bar(s2, cols, ["a", "b", "c"], 4.0) > 4.0
+speech_bubble(s2, 1.0, 5.2, 4.0, 0.5, "말풍선 시험", tail="right")
+_v = block_arrow(s2, 10.0, 3.0, 0.4, 2.0, direction="down")   # 세로: (x, y, w, h) 가 보이는 크기
 assert abs(_v.rotation - 90) < 1e-6 and abs(_v.height / 914400 - 0.4) < 1e-6 and abs(_v.width / 914400 - 2.0) < 1e-6, (_v.width, _v.height)
+for fn in (lambda: step_header(s2, 0, 0, 5, ["하나"]), lambda: summary_bar(s2, cols, ["a"], 4.0),
+           lambda: speech_bubble(s2, 0, 0, 1, 1, "x", tail="위")):
+    try:
+        fn()
+        raise AssertionError("단계 부품 검사")
+    except ValueError:
+        pass
 out = os.path.join(tempfile.mkdtemp(), "diag.pptx")
 d.save(out)
 _, warns = check(out)

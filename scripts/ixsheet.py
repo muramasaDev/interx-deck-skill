@@ -16,7 +16,7 @@ from openpyxl.worksheet.properties import PageSetupProperties
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from sheet_check import FONT, check, dw, line_count, row_height  # noqa: E402
 
-NAVY, GRID = "002060", "BFBFBF"
+HEAD, GRID = "D9D9D9", "A6A6A6"   # 공공기관 정의서식: 연한 회색 머리, 검정 굵은 글씨, 가는 회색 격자
 _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 MIN_DATE = datetime.date(1900, 3, 1)   # Excel 날짜 일련번호가 안전한 범위
 
@@ -28,7 +28,7 @@ def _label(s, what):
         raise ValueError(f"{what} {s!r}: 비었거나 '=' 로 시작하거나 제어 문자가 있음")
     return t
 STATUS = {"완료": "E2EFDA", "진행": "FFF2CC", "계획": "EDEDED", "미정": "FCE4E4"}
-ALIGN = {"id": "center", "code": "center", "text": "left", "num": "right", "date": "center", "status": "center"}
+ALIGN = {"id": "center", "ref": "center", "code": "center", "text": "left", "num": "right", "date": "center", "status": "center"}
 _S = Side(style="thin", color=GRID)
 BORDER = Border(left=_S, right=_S, top=_S, bottom=_S)
 
@@ -39,7 +39,7 @@ def _font(**kw):
 
 @dataclass
 class Field:
-    """열 하나. kind: id, code, text, num(decimals, unit), date, status(mapping)"""
+    """열 하나. kind: id(유일), ref(하위 표의 상위 ID, 첫 두 열 조합이 유일), code, text, num(decimals, unit), date, status(mapping)"""
     name: str
     kind: str
     width: float = None
@@ -134,8 +134,10 @@ class Book:
             if len(row) != len(fields):
                 raise ValueError(f"{name}: {i}번째 행의 값이 {len(row)}개 (열 {len(fields)}개)")
             vals.append([f.cell(v) for f, v in zip(fields, row)])
-        if fields[0].kind == "id":
-            dup = [k for k, c in collections.Counter(r[0] for r in vals).items() if c > 1]
+        key = (lambda r: r[0]) if fields[0].kind == "id" else (
+            (lambda r: tuple(r[:2])) if fields[0].kind == "ref" and len(fields) > 1 else None)   # ref: 상위 ID 를 되풀이하는 하위 표
+        if key:
+            dup = [k for k, c in collections.Counter(key(r) for r in vals).items() if c > 1]
             if dup:
                 raise ValueError(f"{name}: 중복 ID {dup}")
         spans = {}
@@ -176,8 +178,8 @@ class Book:
         mid = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
         def style_head(c):
-            c.font, c.border, c.alignment = _font(bold=True, color="FFFFFF"), BORDER, mid
-            c.fill = PatternFill("solid", fgColor=NAVY)
+            c.font, c.border, c.alignment = _font(bold=True), BORDER, mid
+            c.fill = PatternFill("solid", fgColor=HEAD)
 
         if spans:
             for j in range(1, nc + 1):

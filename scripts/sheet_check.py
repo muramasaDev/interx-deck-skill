@@ -135,7 +135,9 @@ def _sheet(ws, E, W):
     head = [ws.cell(hr, c).value for c in range(1, nc + 1)]
     h1 = str(head[0] or "")
     if h1.upper().endswith("ID") or h1.endswith("번호"):
-        dup = sorted(str(k) for k, n in collections.Counter(ids).items() if n > 1 and k not in (None, "-"))
+        sub_key = nc > 1 and str(head[1] or "") in ("순번", "번호", "코드", "No")   # 하위 표는 (상위 ID, 순번 또는 코드) 가 유일
+        keys = [(ws.cell(r, 1).value, ws.cell(r, 2).value) for r in range(hr + 1, last + 1)] if sub_key else ids
+        dup = sorted(str(k) for k, n in collections.Counter(keys).items() if n > 1 and k not in (None, "-"))
         if dup:
             _add(E, name, "중복 ID", dup)
     dup = sorted(str(k) for k, n in collections.Counter(head).items() if n > 1)

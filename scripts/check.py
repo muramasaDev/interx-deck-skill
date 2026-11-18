@@ -279,7 +279,7 @@ def shape_of(sl):
 main = [sl for sl in body if not any(ph.placeholder_format.idx == 10 and ph.has_text_frame and
                                        re.search(r"Appendix|부록", ph.text_frame.text) for ph in sl.placeholders)]
 tables = sum(1 for sl in main if any(s.has_table for s in sl.shapes)   # 부록 장은 셈에서 뺌
-             and not any(s.name == "IXFLOW" or s.shape_type == 13 for s in sl.shapes))   # 처리 흐름이나 캡처가 있는 장은 표만 있는 장이 아님
+             and not any(s.name == "IXFLOW" or (s.shape_type == 13 and s.width > 2.5 * 914400) for s in sl.shapes))   # 처리 흐름이나 캡처가 있는 장은 표만 있는 장이 아님
 def _numeric(sh):
     """차트, 또는 숫자 칸이 둘 이상인 표"""
     if sh.has_chart:
@@ -292,7 +292,10 @@ def _numeric(sh):
 
 
 _purpose = (re.match(r"ix-purpose:(.+)", _prs.core_properties.category or "") or [None, None])[1]
-for sl in main:   # 숫자 장(차트, 숫자 표)은 출처 줄이 있어야 함 (문서 덱은 문서 정보에 한 번만 적으므로 제외)
+if _purpose == "문서" and any(_numeric(s) for sl in main for s in sl.shapes) and not any(
+        SRC_LINE.search(ln.strip()) for sl in _all for t in slide_texts(sl) for ln in t.split("\n")):
+    bad.append("문서 덱에 출처 줄이 덱 어디에도 없음: 문서 정보 장에 '※ 출처: 자료 이름 (날짜)' 한 줄")
+for sl in main:   # 숫자 장(차트, 숫자 표)은 출처 줄이 있어야 함 (문서 덱은 문서 정보에 한 번만 적으므로 장마다는 제외)
     if _purpose != "문서" and any(_numeric(s) for s in sl.shapes) and not any(
             SRC_LINE.search(ln.strip()) for t in slide_texts(sl) for ln in t.split("\n")):
         bad.append(f"slide{_all.index(sl) + 1}: 차트나 표가 있는 장에 출처 줄이 없음 ('※ 출처: 자료 이름 (날짜)' 한 줄, '기준:' 은 출처가 아님)")

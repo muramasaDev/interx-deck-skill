@@ -1,5 +1,6 @@
 """설계 문서 부품(ixdoc.py) 자체 시험: 장이 만들어지고, 잘못된 입력은 막힘"""
 import os
+import re
 import sys
 import tempfile
 
@@ -19,7 +20,7 @@ LIM = [("항목", "5,000", "개", "-")]
 d.func_page("기능 하나 (M-001)", "요약 문장", flow=["첫 단계", "둘째 단계"], limits=LIM, io=IO, errors=ERR, refs={"기능": "F-001"})
 d.func_page("기능 둘 (M-002)", "요약 문장", flow=["첫 단계", "둘째 단계", "셋째 단계"], io=IO)
 d.section("화면 상세")
-assert d.allow == ["이미\ 등록된\ 이름입니다"], d.allow   # 오류 표의 화면 문구는 문장 검사 예외로 자동 등록
+assert d.allow == [re.escape("이미 등록된 이름입니다")], d.allow   # 오류 표의 화면 문구는 문장 검사 예외로 자동 등록
 d.screen_page("화면 하나 (SCR-01)", "요약 문장", image=png, marks=[(0.1, 0.1, 0.5, 0.3, 1)],
               elements=[("1", "요소", "동작", "검증")])
 
@@ -47,4 +48,16 @@ d.func_page("흐름만 (M-009)", "요약 문장", flow=["첫 단계", "둘째 �
 out = os.path.join(tmp, "doc.pptx")
 d.save(out)
 assert os.path.getsize(out) > 20000
+# 패널 제목과 표 제목이 같으면 주의
+from check_text import check  # noqa: E402
+_d2 = Deck(author="AX Development / 시험 연구원", purpose="문서")
+_d2.cover("제품 설계서 시험", "2026.11.18")
+_d2.section("시험")
+_s2 = _d2.page("중복 제목", lead="요약 문장")
+(_c2,) = report_panels(_s2, ["입출력 항목"], fit=True)
+_c2.field_table(IO, title="입출력 항목")
+_c2.done()
+_p2 = os.path.join(tmp, "dup.pptx")
+_d2.save(_p2)
+assert any("두 번 나옴" in w for w in check(_p2)[1]), check(_p2)[1]
 print("selfcheck_doc OK")
