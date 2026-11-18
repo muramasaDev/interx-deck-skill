@@ -104,6 +104,23 @@ def add_png_fallbacks(files: dict) -> int:
     return made
 
 
+def drop_embedded_fonts(files: dict) -> int:
+    """임베드 글꼴 제거. 원본 양식의 Pretendard, 맑은 고딕 데이터(약 22MB)는 글꼴 이름을 모두 FONT 로 바꾼 뒤에는 쓰이지 않고
+    이름표만 잘못 붙어 덱마다 용량만 키움. 글꼴 파일, 목록, 관계, 형식 선언을 함께 뺌"""
+    gone = [n for n in files if n.startswith("ppt/fonts/")]
+    for n in gone:
+        del files[n]
+    pres = files["ppt/presentation.xml"].decode("utf8")
+    pres = re.sub(r"<p:embeddedFontLst>.*?</p:embeddedFontLst>", "", pres, flags=re.S)
+    pres = re.sub(r'\s(embedTrueTypeFonts|saveSubsetFonts)="[^"]*"', "", pres)
+    files["ppt/presentation.xml"] = pres.encode("utf8")
+    rels = files["ppt/_rels/presentation.xml.rels"].decode("utf8")
+    files["ppt/_rels/presentation.xml.rels"] = re.sub(r'<Relationship [^>]*Type="[^"]*/font"[^>]*/>', "", rels).encode("utf8")
+    ct = files["[Content_Types].xml"].decode("utf8")
+    files["[Content_Types].xml"] = re.sub(r'<Default Extension="fntdata"[^>]*/>', "", ct).encode("utf8")
+    return len(gone)
+
+
 def fit_layout_pictures(path: str) -> int:
     """레이아웃 그림을 장 안으로 맞춤"""
     from pptx import Presentation
@@ -140,10 +157,12 @@ def main(src: str, dst: str) -> None:
         elif n.startswith(("ppt/slides/slide", "ppt/slideLayouts/", "ppt/slideMasters/")) and n.endswith(".xml"):
             files[n] = fix_part(files[n].decode("utf8"), counts).encode("utf8")
     made = add_png_fallbacks(files)
-    order = [i.filename for i in infos] + sorted(set(files) - {i.filename for i in infos})
+    dropped = drop_embedded_fonts(files)
+    order = [i.filename for i in infos if i.filename in files] + sorted(set(files) - {i.filename for i in infos})
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zo:
         for n in order:
             zo.writestr(n, files[n])
+    print("뺀 임베드 글꼴 파일 수:", dropped)
     print("오탈자 고친 수:", counts)
     print("SVG 에 PNG 대체 그림을 단 수:", made)
     print("장 밖으로 나간 레이아웃 그림을 맞춘 수:", fit_layout_pictures(dst))
@@ -162,10 +181,26 @@ def fix_deck(src: str, dst: str) -> None:
     print("SVG 에 PNG 대체 그림을 단 수:", made)
 
 
+def strip_fonts(src: str, dst: str) -> None:
+    """이미 만든 템플릿이나 덱에서 임베드 글꼴만 뺌"""
+    with zipfile.ZipFile(src) as zi:
+        infos = zi.infolist()
+        files = {i.filename: zi.read(i.filename) for i in infos}
+    dropped = drop_embedded_fonts(files)
+    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zo:
+        for i in infos:
+            if i.filename in files:
+                zo.writestr(i.filename, files[i.filename])
+    print("뺀 임베드 글꼴 파일 수:", dropped)
+
+
 if __name__ == "__main__":
     # make_template.py <원본> <템플릿>
     # make_template.py --png-fallback <덱> <출력>
+    # make_template.py --drop-fonts <입력> <출력>
     if sys.argv[1] == "--png-fallback":
         fix_deck(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "--drop-fonts":
+        strip_fonts(sys.argv[2], sys.argv[3])
     else:
         main(sys.argv[1], sys.argv[2])

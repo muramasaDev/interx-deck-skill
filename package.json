@@ -1,6 +1,6 @@
 {
   "name": "@muramasadev/ixdeck",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "INTERX 회사 양식 PPT 플러그인 for Claude Code",
   "bin": {
     "ixdeck": "bin/install.js"
