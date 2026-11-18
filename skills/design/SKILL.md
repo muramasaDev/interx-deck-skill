@@ -24,12 +24,13 @@ description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구�
 - 자율 공장 목표 수치(생산성 200% 등)는 근거 자료가 없는 회사 목표라 인용하면 '회사 목표 수치' 로 밝힘
 
 ## 0-2. 기능 상세 및 화면 상세 장 (설계서, 표 중심)
-- 기능 하나는 `d.func_page(소제목, 요약, flow=[...], limits=[...], io=[...], errors=[...], refs={...})`, 화면 하나는 `d.screen_page(소제목, 요약, image=, marks=, elements=, rules=, refs=)` (엔진 `ixdoc.py`)
+- 출발점은 `scripts/example_doc.py` (기능 상세, 화면 상세 예제, 관문 통과). 기능 하나는 `d.func_page(소제목, 요약, flow=[...], limits=[...], io=[...], errors=[...], refs={...}, source=)`, 화면 하나는 `d.screen_page(소제목, 요약, image=, marks=, elements=, rules=, refs=)` (엔진 `ixdoc.py`)
 - 있는 구역만 패널이 되고 패널 너비는 내용 양으로 정함. `func_page` 는 행이 적으면 행을 넉넉하게, 많으면 촘촘하게 자동 조정 (`screen_page` 는 고정). 오류 표의 화면 문구 중 서술체 검사에 걸리는 것은 자동으로 검사 예외, 그 밖의 화면 문구는 `d.allow_text("문구")`
+- 문서 덱은 장마다 출처를 달지 않고 한 장에만 `source=` 로 적음 (덱 어디에도 없으면 관문 실패)
 - 한계 값은 글 목록이 아니라 `limit_table` (값 열은 남색 굵은 글씨), 입출력은 `field_table`, 오류는 `error_table` (코드는 3자리 숫자 또는 대문자 식별자), 화면 요소는 `element_table` (번호가 캡처의 번호 원과 같아야 하고 어긋나면 오류), 관련 번호는 `ref_table`, 처리 순서는 `flow`
 - 표 칸이 줄 바꿈되면 그 행만 높아짐. 칸이 비면 오류 (없으면 `-`)
 - 같은 틀이 연달아 나오지 않게: 구역이 다른 기능끼리 묶고, 흐름이 핵심인 기능은 `chevrons` 를 쓴 장으로 따로 만듦
-- 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`, 단계형 장 `step_header` 와 `summary_bar`, 말풍선 `speech_bubble`)
+- 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`, 단계형 장 `step_header`, `summary_bar`, `backdrop`, 헤드라인 `headline`, 말풍선 `speech_bubble`)
 
 ## 1. 구성도 장 (`d.page(..., doc=True)`)
 ```python

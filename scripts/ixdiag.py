@@ -1,12 +1,14 @@
 """구성도 역할 부품 (skills/design/references/구성도_레퍼런스_문법.md): 역할 색 상자, 그라데이션 블록 화살표,
 프로토콜 알약, 하단 약어 풀이 영역. ixdeck.py 맨 아래에서 불러 와 같은 이름공간에서 씀"""
 from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
-from ixdeck import (BLACK, GRAY_L, GREEN, NAVY, SLATE0, SLATE3, SLATE6, WHITE, _adj, _fill, _lh, _line,
+from ixdeck import (BLACK, GRAY_L, GREEN, NAVY, SLATE0, SLATE3, SLATE6, WHITE, _adj, _fill, _font, _lh, _line,
                     _no_style_effects, _obst, _reg, _set_text, _text_w, big_arrow, box, text)
 
-__all__ = ["AMBER", "ROLE", "role_box", "block_arrow", "pill", "abbr_legend", "step_header", "summary_bar", "speech_bubble"]
+__all__ = ["AMBER", "ROLE", "role_box", "block_arrow", "pill", "abbr_legend", "step_header", "summary_bar", "speech_bubble", "headline",
+           "backdrop"]
 
 AMBER = "FFC000"
 ROLE = {"base": (SLATE6, WHITE), "ai": (GREEN, WHITE), "ext": (AMBER, BLACK), "platform": (NAVY, WHITE)}   # 칩 색의 뜻 (바탕, 글자)
@@ -98,6 +100,31 @@ def speech_bubble(s, x, y, w, h, t, tail="left"):
     _line(sh, SLATE6, 1.0)
     _set_text(sh, t, 9, False, BLACK, "l", "m", (0.14, 0.06, 0.14, 0.06))
     return _obst(s, sh)
+
+
+def headline(s, x, y, w, lines, size=14, accent=GREEN):
+    """가운데 맞춤 헤드라인: 줄마다 [(글, 강조 여부)] 조각, 강조 조각만 accent 색 (초록, 파랑 등). 아래 y 를 돌려줌"""
+    if not lines or any(not parts for parts in lines):
+        raise ValueError("headline 줄이 비었음: [[(글, False), (키워드, True)], ...]")
+    h = len(lines) * _lh(size) + 0.06
+    sh = box(s, x, y, w, h, "", fill=None, size=size, color=BLACK, inset=(0, 0, 0, 0))
+    for i, parts in enumerate(lines):
+        p = sh.text_frame.paragraphs[0] if i == 0 else sh.text_frame.add_paragraph()
+        p.alignment = PP_ALIGN.CENTER
+        for r in list(p.runs):
+            p._p.remove(r._r)
+        for t, on in parts:
+            r = p.add_run()
+            r.text = t
+            _font(r, size, False, accent if on else BLACK)
+    _obst(s, sh)
+    return y + h
+
+
+def backdrop(s, cols, y, h):
+    """캡처 뒤 연한 쉐브론 배경 (단계마다 하나). cols 는 step_header 의 결과, 캡처보다 먼저 그림"""
+    for i, (cx, cw) in enumerate(cols):
+        box(s, cx, y, cw + 0.18, h, fill="EEF1F5", geom="homePlate" if i == 0 else "chevron", inset=(0, 0, 0, 0))
 
 
 import ixdeck as _ixdeck  # noqa: E402  ixdiag 를 먼저 불러도 ixdeck 이름공간에 들어가게 (맨 아래에서 한 번 더)

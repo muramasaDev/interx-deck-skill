@@ -38,8 +38,8 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 1. **`scripts/example_build.py` 를 과제 폴더에 `build.py` 로 복사해 시작한다.** 모든 장 유형과 부품이 들어 있고 관문을 통과한다
 2. 절과 장: `d.section("절 이름")` 다음 `d.page("장 주제", lead="요약 한 줄", doc=구성도면 True)`. 한 장에 메시지 하나
 3. 자리는 자동 배치 함수로만 (`report_panels`, `DocGrid`). 좌표를 손으로 쓰지 않는다. 단위 인치
-4. **`python -P scripts/gate.py <build.py> <장 수>`** (Mac 은 `python3`) 가 "결과: 통과" 할 때까지 고친다. 기준을 낮추지 않는다(`strict=False`, `--soft` 는 자체 시험 전용). 렌더는 장 XML 해시(렌더 폴더 `hashes.json`)로 바뀐 장만 다시 그리고 나머지는 이전 PNG 를 씀(장 수나 틀이 바뀌면 전체, PDF 는 항상 전체). 장 순서는 presentation.xml 의 장 목록 순서, 틀 해시는 레이아웃, 마스터, 테마와 그 관계 파일, media, presentation.xml, 렌더 스크립트(render.py, render.ps1)를 포함
-   - build 없이 기존 pptx(`edit_deck.py` 결과, 받은 덱)를 넘길 때: `python -P scripts/gate.py --deck 덱.pptx [장 수]` 가 같은 검사, 렌더, `text.md`, `titles.md`, PDF, 통과 기록을 만드는 것 (파일 이름 규칙도 검사)
+4. **`python -P scripts/gate.py <build.py> <장 수>`** (Mac 은 `python3`) 가 "결과: 통과" 할 때까지 고친다. 기준을 낮추지 않는다(`strict=False`, `--soft` 는 자체 시험 전용). 렌더는 장 XML 해시(렌더 폴더 `hashes.json`)로 바뀐 장만 다시 그리고 나머지는 이전 PNG 를 씀(장 수나 틀이 바뀌면 전체). 장 순서는 presentation.xml 의 장 목록 순서, 틀 해시는 레이아웃, 마스터, 테마와 그 관계 파일, media, presentation.xml, 렌더 스크립트(render.py, render.ps1)를 포함
+   - build 없이 기존 pptx(`edit_deck.py` 결과, 받은 덱)를 넘길 때: `python -P scripts/gate.py --deck 덱.pptx [장 수]` 가 같은 검사, 렌더, `text.md`, `titles.md`, 통과 기록을 만드는 것 (파일 이름 규칙도 검사)
 5. 렌더 그림을 9절 장 검토 목록으로 본다
 6. **사람이 쓴 덱 검토**: 관문이 만든 `text.md`, `titles.md`(장별 소제목 및 요약 줄만), `sheet.png` 와 `third_party/im-not-ai/quick-rules.md` 로 `references/review_prompt.md` 지시문을 검토 에이전트에 준다. 고칠 곳을 모두 고치고 관문을 다시 돌린 뒤 새 에이전트로 같은 검토를 되풀이한다
    - 횟수는 덱에 맞춤 (토큰이 가장 큰 단계): 사내 덱 1회, 고객 보고와 납품 덱 최대 2회. 문서 덱(`purpose="문서"`)은 20장을 넘으면 `text.md` 전체 대신 `titles.md` 와 장 유형(기능, 화면, 표지 등)별 대표 3장의 글만 준다. 같은 틀로 찍은 장은 한 장을 고치면 나머지에 같은 수정을 적용
@@ -48,7 +48,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 7. 넘기기 전 사실 정확성 검토 1건 (원천 대조). 6과 같은 에이전트에 근거 자료 경로를 주면 한 번에 끝낼 수 있음
 8. **넘기기 전 `python -P scripts/gate.py --verify 덱.pptx`** 가 '통과 기록과 같음' 이어야 함. 관문 통과 때 통과 기록(sha256, 시각, 판 번호, 결과)이 개인 설정 폴더 `gate/` 에 생기고 (납품 폴더에는 기록 파일을 남기지 않음, 덱 옆의 옛 `.gate.json` 은 다음 관문 때 치움), 통과 뒤 pptx 를 고쳤으면 '다름' (종료 코드 1)
 
-**만든 pptx 를 PowerPoint COM 으로 직접 열지 않는다.** 회사 DRM 이 암호화한다(SCDSA004). render.py 는 버리는 사본만 연다. 최종본은 PDF 로 보낸다. 관문이 pptx 옆에 같은 이름의 PDF 를 만든다 (`render.py --pdf`). 외부 서비스에 보낸 내용은 보관될 수 있으니 회사 데이터, 고객명, 설비명은 공개 범위가 정해지기 전에 내보내지 않는다.
+**만든 pptx 를 PowerPoint COM 으로 직접 열지 않는다.** 회사 DRM 이 암호화한다(SCDSA004). render.py 는 버리는 사본만 연다. PDF 는 자동으로 만들지 않는다 (필요하면 사용자가 직접 저장). 외부 서비스에 보낸 내용은 보관될 수 있으니 회사 데이터, 고객명, 설비명은 공개 범위가 정해지기 전에 내보내지 않는다.
 
 ## 3. 덱 구성 (자동)
 | 순서 | 장 | 레이아웃 | 만드는 곳 |
@@ -125,7 +125,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 - **파일 이름 `제목_작성자_v버전_YYMMDD`**. `OUT = d.filename("제목", "0.9.0", 폴더)` 로 만든다 (띄어쓰기는 밑줄). 규칙과 다르면 관문(check)이 실패
   - 날짜는 만든 날 (연월일 여섯 자리), 제목의 띄어쓰기는 밑줄, 작성자는 이름만 (직급 빼고). "최종", "복사본" 금지
   - 버전: 첫 판 0.1.0, 고친 판은 끝자리, 내용이 늘면 가운데 자리, 확정본 1.0.0. 올릴 자리는 사용자에게 확인
-- 저장 위치는 사용자가 정한 폴더, 없으면 지금 작업 폴더. pptx 와 PDF 가 나란히 생긴다. 렌더 그림은 임시 폴더에만 (쌓지 않음)
+- 저장 위치는 사용자가 정한 폴더, 없으면 지금 작업 폴더. 저장 결과는 pptx 하나이고 PDF 는 만들지 않는다. 렌더 그림은 임시 폴더에만 (쌓지 않음)
 - 새 판을 만들면 옛 판은 보관 폴더로. 백업본을 따로 만들지 않음
 - 바뀐 사실이 있으면 모든 자료에서 옛 값을 찾아 같이 고침
 
@@ -184,7 +184,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | check_ban.py | 금지 표현 (차트, 수식 글, 발표자 노트 포함), 자리표시자 (TODO, TBD, xxx, lorem, [insert, '텍스트를 입력', '예시 값', '요약 한 줄') |
 | check_text.py | AI 투 수식어, 서술체, 느낌표 (실패), 의인화, 명사 잇기, 긴 줄, im-not-ai 바꿀 어휘, 날짜 표기 3종 이상 혼용 (주의). 발표자 노트도 검사(서술체 제외) |
 | deck_text.py | 장마다 글을 읽는 순서로 `text.md` 에, 장별 소제목 및 요약 줄만 `titles.md` 에 (사람이 쓴 덱 검토용) |
-| render.py | 장마다 PNG, 모아 보기 sheet.png (임시 폴더 `interx_gate/<덱>/`), pptx 옆 PDF. Windows 는 PowerPoint, Mac 은 PowerPoint 또는 LibreOffice. Noto Sans KR 이 없으면 종료 코드 3 으로 멈춤 (글꼴 폴더 파일, Windows 글꼴 등록 값(HKLM, HKCU), Mac 은 fc-list 로 확인) |
+| render.py | 장마다 PNG, 모아 보기 sheet.png (임시 폴더 `interx_gate/<덱>/`, PDF 는 만들지 않음). Windows 는 PowerPoint, Mac 은 PowerPoint 또는 LibreOffice. Noto Sans KR 이 없으면 종료 코드 3 으로 멈춤 (글꼴 폴더 파일, Windows 글꼴 등록 값(HKLM, HKCU), Mac 은 fc-list 로 확인) |
 | gate.py --verify | 덱 해시를 통과 기록(개인 설정 폴더 `gate/`)과 대조. 같으면 종료 코드 0 |
 - build.py 마지막 줄은 `print(OUT)`
 - **장 검토 목록** (자동 검사가 못 보는 것): 장마다 메시지 하나와 그 요약 줄, 선 흐름과 번호 순서, 같은 것은 같은 이름과 색과 아이콘, 빈 칸을 행 높이나 큰 글자로 메우지 않음, 빈 곳을 블록으로 채우지 않음 (패널이 내용에 맞춰 줄어듦), 캡처 네모가 맞는 자리, 목차가 핵심만 담음, 처음 보는 사람이 이해함

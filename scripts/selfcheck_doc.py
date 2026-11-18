@@ -17,7 +17,7 @@ d.section("기능 상세")
 IO = [("항목 A", "입력", "문자열", "필수", "설명")]
 ERR = [("400", "조건", "이미 등록된 이름입니다")]
 LIM = [("항목", "5,000", "개", "-")]
-d.func_page("기능 하나 (M-001)", "요약 문장", flow=["첫 단계", "둘째 단계"], limits=LIM, io=IO, errors=ERR, refs={"기능": "F-001"})
+d.func_page("기능 하나 (M-001)", "요약 문장", flow=["첫 단계", "둘째 단계"], limits=LIM, io=IO, errors=ERR, refs={"기능": "F-001"}, source="시험 자료 (2026.11.18)")
 d.func_page("기능 둘 (M-002)", "요약 문장", flow=["첫 단계", "둘째 단계", "셋째 단계"], io=IO)
 d.section("화면 상세")
 assert d.allow == [re.escape("이미 등록된 이름입니다")], d.allow   # 오류 표의 화면 문구는 문장 검사 예외로 자동 등록
@@ -45,6 +45,8 @@ bad(lambda: d.screen_page("범위 거꾸로", "요약", image=png, marks=[(0.5, 
 bad(lambda: d.screen_page("번호 겹침", "요약", image=png, marks=[(0, 0, 0.5, 0.5, 1), (0.5, 0.5, 1, 1, 1)], elements=[("1", "요소", "동작", "검증")]), "marks 번호 겹침")
 bad(lambda: c.element_table([("1", "요소", None, "검증")]), "None 칸")
 d.func_page("흐름만 (M-009)", "요약 문장", flow=["첫 단계", "둘째 단계"])   # 한 구역이어도 패널이 전체 폭
+_txt = " ".join(sh.text_frame.text for sl in d.prs.slides for sh in sl.shapes if sh.has_text_frame)
+assert "※ 출처: 시험 자료 (2026.11.18)" in _txt, "source 줄"
 out = os.path.join(tmp, "doc.pptx")
 d.save(out)
 assert os.path.getsize(out) > 20000

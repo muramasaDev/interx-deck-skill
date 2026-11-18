@@ -133,9 +133,8 @@ def check_deck(pptx, want):
         os.remove(f)   # 예전 것 섞임 방지
     if os.path.exists(hfile):
         os.remove(hfile)   # 렌더가 끝나야 다시 씀
-    pdf = os.path.splitext(pptx)[0] + ".pdf"   # 결과물: pptx 옆에 같은 이름
     sel = ["--slides", ",".join(map(str, changed)) if changed else "none"] if reuse else []
-    rc, out = run([sys.executable, "-P", os.path.join(HERE, "render.py"), pptx, img, "--pdf", pdf] + sel)
+    rc, out = run([sys.executable, "-P", os.path.join(HERE, "render.py"), pptx, img] + sel)   # PDF 는 만들지 않음 (사용자가 직접 저장)
     pngs = sorted((f for f in os.listdir(img) if f[0] == "s" and f[1:-4].isdigit()), key=lambda f: int(f[1:-4]))
     if rc or not pngs:
         fails.append("렌더")
@@ -168,7 +167,6 @@ def check_deck(pptx, want):
         print(f"== 5. 글 검토: {os.path.join(img, 'text.md')}, 요약 줄 목록 {os.path.join(img, 'titles.md')}, sheet.png 로 "
               "using SKILL '사람이 쓴 덱 검토'")
         print(f"== 파일: {pptx}")
-        print(f"         {pdf}")
     new, old = gate_record(pptx), legacy_gate_record(pptx)
     try:
         if os.path.exists(old):

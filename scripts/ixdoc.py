@@ -97,10 +97,10 @@ def _comfort(n):
     return 0.27 if n >= 22 else 0.34 if n >= 14 else 0.42
 
 
-def func_page(self, subtitle, lead, *, flow, limits=None, io=None, errors=None, refs=None, notes=None):
+def func_page(self, subtitle, lead, *, flow, limits=None, io=None, errors=None, refs=None, notes=None, source=None):
     """기능 상세 장. 있는 구역만 패널이 된다 (흐름은 항상).
     flow=[글], limits=[(항목, 값, 단위, 비고)], io=[(항목, 방향, 형식, 필수, 설명)],
-    errors=[(코드, 조건, 화면 문구 및 처리)], refs={구분: 번호}"""
+    errors=[(코드, 조건, 화면 문구 및 처리)], refs={구분: 번호}, source=출처 글 (패널 아래 '※ 출처: ...' 한 줄, 문서 덱은 한 장에만)"""
     s = self.page(subtitle, lead=lead, notes=notes)
     self.allow_text(*(e[2] for e in errors or () if len(e) == 3 and isinstance(e[2], str)))
     rh = _comfort(len(flow) + len(limits or ()) + len(io or ()) + len(errors or ()) + len(refs or ()))
@@ -125,7 +125,7 @@ def func_page(self, subtitle, lead, *, flow, limits=None, io=None, errors=None, 
                 c.error_table(errors, row_h=rh)
         builders.append(right)
         wt.append(1.5 + 0.08 * (len(io or ()) + len(errors or ())))
-    cols = report_panels(s, titles, widths=wt if len(wt) > 1 else None, fit=True)
+    cols = report_panels(s, titles, widths=wt if len(wt) > 1 else None, fit=True, footnote=f"※ 출처: {source}" if source else None)
     for c, b in zip(cols, builders):
         b(c)
     for c in cols:
@@ -133,7 +133,7 @@ def func_page(self, subtitle, lead, *, flow, limits=None, io=None, errors=None, 
     return s
 
 
-def screen_page(self, subtitle, lead, *, image, marks, elements, rules=None, refs=None, caption=None, notes=None):
+def screen_page(self, subtitle, lead, *, image, marks, elements, rules=None, refs=None, caption=None, notes=None, source=None):
     """화면 상세 장: 왼쪽에 캡처를 크게, 오른쪽에 번호별 요소 표.
     image=캡처 경로, marks=[(x0, y0, x1, y1, 번호)] (그림 비율 0 ~ 1), elements=[(번호, 요소, 동작, 검증 및 표시)],
     rules=[(항목, 값, 단위, 비고)] 화면 한계 값, refs={구분: 번호}"""
@@ -148,7 +148,7 @@ def screen_page(self, subtitle, lead, *, image, marks, elements, rules=None, ref
     nums = {str(m[4]) for m in marks}
     if nums != {str(e[0]) for e in elements}:
         raise ValueError(f"캡처 번호 {sorted(nums)} 와 요소 표 번호 {sorted(str(e[0]) for e in elements)} 가 다름")
-    left, right = report_panels(s, ["화면", "요소 설명"], widths=(1.7, 1.0), fit=True)
+    left, right = report_panels(s, ["화면", "요소 설명"], widths=(1.7, 1.0), fit=True, footnote=f"※ 출처: {source}" if source else None)
     left.image(image, left.bottom - left.top - CAP_H - 0.14, marks=marks, title=caption or subtitle)   # 0.14: 번호 원 여유
     right.element_table(elements)
     if rules:

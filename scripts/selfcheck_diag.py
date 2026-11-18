@@ -46,6 +46,16 @@ for fn in (lambda: step_header(s2, 0, 0, 5, ["하나"]), lambda: summary_bar(s2,
         raise AssertionError("단계 부품 검사")
     except ValueError:
         pass
+s3 = d.page("헤드라인과 배경", lead="요약 문장", doc=True, figure="시험 헤드라인")
+_y = headline(s3, 0.6, 1.95, 8.0, [[("키워드만 ", False), ("색을 입힘", True)], [("둘째 줄", False)]])
+assert _y > 1.95
+_cols = step_header(s3, 0.6, _y + 0.1, 8.0, ["가", "나"])
+backdrop(s3, _cols, _y + 0.7, 2.0)
+try:
+    headline(s3, 0, 0, 5, [])
+    raise AssertionError("빈 헤드라인")
+except ValueError:
+    pass
 out = os.path.join(tempfile.mkdtemp(), "diag.pptx")
 d.save(out)
 _, warns = check(out)
