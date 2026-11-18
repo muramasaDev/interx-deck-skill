@@ -6,7 +6,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const CACHE = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "interx-deck", "update.json");
+const CACHE = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "ixdeck", "update.json");
 const REPO = "https://github.com/muramasaDev/interx-deck-skill";
 const num = (v) => v.replace(/^v/, "").split(".").map(Number);
 const save = (c) => { fs.mkdirSync(path.dirname(CACHE), { recursive: true }); fs.writeFileSync(CACHE, JSON.stringify(c)); };
@@ -28,7 +28,7 @@ try {
   }
   if (c.latest && newer(c.latest, mine)) {
     process.stdout.write(JSON.stringify({
-      systemMessage: `interx-deck 새 판 ${c.latest} (지금 ${mine}): npx --allow-git=all muramasaDev/interx-deck-skill`,
+      systemMessage: `ixdeck 새 판 ${c.latest} (지금 ${mine}): npx --allow-git=all muramasaDev/interx-deck-skill`,
     }));
   }
 } catch { /* 네트워크, 권한 문제는 알리지 않음 */ }

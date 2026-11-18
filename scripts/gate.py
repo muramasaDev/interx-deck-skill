@@ -14,8 +14,9 @@ import zipfile
 from datetime import datetime
 
 sys.stdout.reconfigure(errors="replace")
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, HERE)   # python -P 는 스크립트 폴더를 넣지 않음
+from ixpaths import gate_record, legacy_gate_record  # noqa: E402
 BAN = os.path.join(HERE, "check_ban.py")
 
 
@@ -25,7 +26,10 @@ def _sha(path):
 
 
 def _record(pptx):
-    return os.path.splitext(pptx)[0] + ".gate.json"
+    """통과 기록 위치: 개인 설정 폴더 (납품 폴더에는 남기지 않음). 옛 위치(덱 옆)에 있으면 그것을 읽음"""
+    new = gate_record(pptx)
+    old = legacy_gate_record(pptx)
+    return old if not os.path.exists(new) and os.path.exists(old) else new
 
 
 def _version():
@@ -98,7 +102,7 @@ def check_deck(pptx, want):
     if rc:
         fails.append("check")
     if not os.path.exists(BAN):
-        print(f"== 3. 금지 표현 검사 파일 없음: {BAN} (interx-deck/scripts 에 있어야 함)")
+        print(f"== 3. 금지 표현 검사 파일 없음: {BAN} (ixdeck/scripts 에 있어야 함)")
         fails.append("금지 표현 검사 없음")
     else:
         rc, out = run([sys.executable, "-P", BAN, pptx])
@@ -165,14 +169,26 @@ def check_deck(pptx, want):
               "using SKILL '사람이 쓴 덱 검토'")
         print(f"== 파일: {pptx}")
         print(f"         {pdf}")
-    rec = _record(pptx)
+    new, old = gate_record(pptx), legacy_gate_record(pptx)
+    try:
+        if os.path.exists(old):
+            os.remove(old)   # 덱 옆의 옛 기록은 치움 (납품 폴더에 부산물을 남기지 않음)
+    except OSError:
+        pass   # 지울 권한이 없어도 관문 결과는 그대로
     if fails:
-        if os.path.exists(rec):
-            os.remove(rec)   # 실패한 덱에 예전 통과 기록을 남기지 않음
+        if os.path.exists(new):
+            os.remove(new)   # 실패한 덱에 예전 통과 기록을 남기지 않음
     else:   # 넘기기 전 gate.py --verify 가 이 기록과 대조
-        json.dump({"pptx": os.path.basename(pptx), "sha256": _sha(pptx), "result": "통과", "version": _version(),
+        os.makedirs(os.path.dirname(new), exist_ok=True)
+        for f in glob.glob(os.path.join(os.path.dirname(new), "*.json")):   # 없어진 덱의 기록은 치움
+            try:
+                if not os.path.exists(json.load(open(f, encoding="utf8")).get("path", f)):
+                    os.remove(f)
+            except (OSError, ValueError):
+                pass
+        json.dump({"pptx": os.path.basename(pptx), "path": os.path.abspath(pptx), "sha256": _sha(pptx), "result": "통과", "version": _version(),
                    "time": datetime.now().isoformat(timespec="seconds")},
-                  open(rec, "w", encoding="utf8"), ensure_ascii=False, indent=1)
+                  open(new, "w", encoding="utf8"), ensure_ascii=False, indent=1)
     print("결과: " + ("실패 " + ", ".join(fails) if fails else "통과"))
     return 1 if fails else 0
 

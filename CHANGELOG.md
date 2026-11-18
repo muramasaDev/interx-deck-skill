@@ -2,6 +2,20 @@
 
 판 번호 규칙 (대.중간.작은): 대는 회사 양식 교체나 기존 빌더 전면 재작성, 중간은 기존 빌더 코드를 고쳐야만 통과하는 변경(함수 이름이나 인자 변경 및 삭제, 관문 실패 규칙 추가), 작은은 그 밖의 전부(결함 수정, 자산, 주의 검사, 새 도구, 문서, 모양 조정, 영향 없는 새 부품)
 
+## 1.7.2 (2026-11-18)
+- 이름: interx-deck 에서 ixdeck 으로 (플러그인 이름 및 호출 `ixdeck:using` 등, 설치 폴더 `skills/ixdeck`, 개인 설정 폴더 `~/.claude/ixdeck`는 첫 실행 때 옛 폴더에서 옮김). 옛 설치 경로 `skills/interx-deck` 는 새 폴더를 가리키는 연결로 잠시 유지 (다른 프로젝트 덱 빌더가 옛 경로로 엔진을 찾음). `example_build.py` 의 엔진 찾기는 두 이름 모두 봄. 저장소 이름은 그대로
+- 새 갈래 `sheet` (xlsx 정의서): `ixsheet.py` (한 표 한 시트, 머리행 필터 및 틀 고정, 병합 및 빈 셀 금지, 숫자 오른쪽 및 코드 가운데 정렬, 상태 색, 줄 수로 계산한 행 높이, A4 가로 인쇄, 문서 정보 및 개정 이력 시트, 추적 매트릭스), `sheet_check.py` (규칙 검사), `xlsx_view.py` (Edge 로 시트별 그림, DRM 때문에 Excel 을 못 써서 근사 그림), `selfcheck_sheet.py`
+- 설계 문서 부품 `ixdoc.py`: `Deck.func_page`, `Deck.screen_page`, `Col.field_table`, `limit_table`, `error_table`, `element_table`, `ref_table`, `flow`. 표는 행마다 줄 수에 맞춰 높이를 따로 정함 (`table(row_hs=)`). `selfcheck_doc.py`
+- 통과 기록 `.gate.json` 을 덱 옆이 아니라 개인 설정 폴더 `gate/` 에 둠 (납품 폴더에 부산물이 섞이지 않음). 덱 옆의 옛 기록은 다음 관문 때 치움. 경로 처리는 `ixpaths.py`
+- 구성도 문법 주의: 연결선 색은 의미 셋(데이터, 제어, 공통 버스)까지 허용 (빨강 끊김 별도), 넷부터 주의
+- 표 캡션: 머리에 `단위` 열이 있는 표는 단위 필요 주의를 내지 않음
+- 설치: Python 패키지에 openpyxl 추가. 옛 이름 자리 `skills/interx-deck` 는 `scripts` 연결만 둔 폴더 (plugin.json 이 없어 두 폴더가 같은 플러그인 이름으로 겹치지 않음), 연결을 못 만들면 옛 폴더를 되돌림. 옛 개인 설정 폴더는 새 폴더에 없는 것만 합침 (시작 훅이 새 폴더를 먼저 만들어도 안전). 제거는 옛 이름 자리도 지움. 설치 시험에 옛 판에서 올리는 경우 추가. 엔진 스크립트는 연결 경로로 불려도 실제 위치(realpath)에서 assets 를 찾음
+- 문서 덱(`purpose="문서"`) 검사: 장마다 출처 줄 요구 없음, 처리 흐름이나 캡처가 있는 장은 표만 있는 장으로 세지 않음, 같은 출처 문구 반복은 주의. 오류 표의 서술체 화면 문구는 검사 예외 (`d.allow_text`)
+- sheet 입력 검증: 이름, 머리, 단위, 그룹 라벨은 비거나 `=` 로 시작하면 거부, 사전 행의 여분 및 빠진 키, 날짜 범위, 제어 문자, 행 높이 409pt 상한, 시트 이름 대소문자 중복. sheet_check 는 수식 셀과 409.5pt 초과 행 오류, 큰 표 속도 개선
+- 통과 기록에 덱 경로를 적고 없어진 덱의 기록은 치움
+- 구성도 레퍼런스 문법 `skills/design/references/구성도_레퍼런스_문법.md` 와 부품 `ixdiag.py`: `role_box` (역할 색 칩), `block_arrow` (그라데이션 블록 화살표), `pill` (프로토콜 알약), `abbr_legend` (약어 풀이). `selfcheck_diag.py`
+- 문장 검사 주의 추가: 표지 제목에 제품이나 과제 이름 없음, 제목 및 짧은 줄의 영문 뒤 한글 붙여 씀, 같은 출처 문구가 여러 장에 반복
+
 ## 1.7.1 (2026-11-16)
 - 회사 방법론 A1 (전략 수립 절차서, 공정 분야) 요약 `skills/design/references/A1_방법론.md`: 7단계 절차, 5개 역할, X1 ~ X5 및 Yn 변수, DAS 칸, 품질 지수, Level 1 ~ 5, 과제 우선순위 가중치. design 스킬 0절, using 스킬 0-1절
 - 새 부품: `Col.das_table` (데이터 수집 명세서), `Col.quality_table` (품질 지수 자동 계산, 95% 기준), `Col.priority_table` 및 `Col.priority_quad` (과제 우선순위 평가표와 4분면), `Col.levels` (수준 단계 띠)

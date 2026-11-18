@@ -10,7 +10,7 @@ import zipfile
 
 from lxml import etree
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from ixdeck import _NUM_UNIT  # noqa: E402
 
 sys.stdout.reconfigure(errors="replace")
@@ -113,7 +113,7 @@ def main():
     print(f"출력: {a.out}")
     print(f"바뀐 장: {report or '없음'}")
     print(f"안 바뀐 장: {len(parts) - len(changed)}장 (장 XML 해시 같음), 그 밖 파트 {n_other}개 중 다른 것 {len(other)}개")
-    print(f'다음: python -P {os.path.join(os.path.dirname(os.path.abspath(__file__)), "gate.py")} --deck "{a.out}"  '
+    print(f'다음: python -P {os.path.join(os.path.dirname(os.path.realpath(__file__)), "gate.py")} --deck "{a.out}"  '
           "(검사, 렌더, 통과 기록. 출력 이름도 제목_작성자_v버전_YYMMDD 규칙)")
     sys.exit(1 if other or any(parts[i - 1] not in roots for i in changed) else 0)
 

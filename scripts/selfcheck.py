@@ -6,7 +6,7 @@ import os
 import sys
 import zipfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from ixdeck import *  # noqa: E402,F403
 from ixdeck import _linear, _math, _reg, etree  # noqa: E402
 
@@ -242,7 +242,7 @@ except ValueError as e:
 _x = etree.tostring(_math(r"J_{보정} = J_{0} \times \frac{T + E}{\hat{d}}", 12, True), encoding="unicode")   # 수식
 assert all(t in _x for t in ("<m:f>", "<m:sSub>", "<m:acc>", "\U0001D43D", ">보정<", ">×<")), _x
 assert _linear(r"J_{0} \times \frac{T}{E}") == "J_0 × (T) / (E)", _linear(r"J_{0} \times \frac{T}{E}")
-_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 판 번호 셋이 같아야 함
+_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))   # 판 번호 셋이 같아야 함
 _vs = {f: json.load(open(os.path.join(_root, f), encoding="utf8")) for f in
        ("package.json", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json")
        if os.path.exists(os.path.join(_root, f))}   # 설치본에는 package.json 이 없음
@@ -256,7 +256,7 @@ import check_text  # noqa: E402
 import deck_text  # noqa: E402
 import update_imnotai  # noqa: E402
 
-_here = os.path.dirname(os.path.abspath(__file__))
+_here = os.path.dirname(os.path.realpath(__file__))
 _tmp = tempfile.mkdtemp(prefix="ixself_")
 
 
@@ -937,10 +937,12 @@ _dn = Deck(author="AX Development / 시험 연구원", purpose="문서")
 _dn.cover("구성도 문법", "2026.11.16")
 _dn.section("구성")
 _ds = _dn.page("선과 아이콘", lead="요약")
-_b = [box(_ds, 1 + 2.5 * i, 3.0, 1.0, 0.3, f"상자{i}") for i in range(4)]
+_b = [box(_ds, 1 + 2.2 * i, 3.0, 1.0, 0.3, f"상자{i}") for i in range(5)]
 for _i, _c in enumerate((NAVY, GRAY, TEAL)):
     connect(_ds, _b[_i], "right", _b[_i + 1], "left", color=_c)
-assert any("연결선 색 3종" in m for m in diagram_notes(_ds)), diagram_notes(_ds)
+assert not any("연결선 색" in m for m in diagram_notes(_ds)), diagram_notes(_ds)   # 셋까지는 통과
+connect(_ds, _b[3], "right", _b[4], "left", color="E36C0A")
+assert any("연결선 색 4종" in m for m in diagram_notes(_ds)), diagram_notes(_ds)
 icon(_ds, "server_rack", 1.0, 5.0, w=0.4)
 icon(_ds, "plc", 2.0, 5.0, w=0.4)
 assert any("섞임" in m and "plc" in m for m in diagram_notes(_ds)), diagram_notes(_ds)

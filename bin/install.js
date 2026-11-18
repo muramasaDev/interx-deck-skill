@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // npx 설치 명령: install | uninstall | --version
-// 개인 설정(~/.claude/interx-deck/profile)은 건드리지 않음
+// 개인 설정(~/.claude/ixdeck/profile)은 건드리지 않음
 "use strict";
 const fs = require("fs");
 const os = require("os");
@@ -10,7 +10,8 @@ const { execSync } = require("child_process");
 const SRC = path.resolve(__dirname, "..");
 const PKG = require(path.join(SRC, "package.json"));
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-const DEST = path.join(CLAUDE, "skills", "interx-deck");
+const DEST = path.join(CLAUDE, "skills", "ixdeck");
+const OLD = path.join(CLAUDE, "skills", "interx-deck");   // 1.7.x 까지의 설치 폴더 이름
 const MARK = ".installed-by-npm";
 const ITEMS = [".claude-plugin", "hooks", "skills", "scripts", "assets", "third_party", "README.md", "CHANGELOG.md"];
 
@@ -165,7 +166,7 @@ function banner() {
     console.log(`  ${grad("Changhun Jeong", EDGE, BLOOD)}`);
   }
   if (COLOR) process.stdout.write("\x1b[?25h");
-  const head = `${dim("─ ")}${bold("interx-deck")} `;
+  const head = `${dim("─ ")}${bold("ixdeck")} `;
   const ver = ` ${rgb(RED, "1;")("v" + PKG.version)}${dim(" ─")}`;
   console.log();
   console.log(`  ${dim("╭")}${head}${dim("─".repeat(Math.max(0, W - 2 - width(head) - width(ver))))}${ver}${dim("╮")}`);
@@ -194,6 +195,48 @@ function ownedByUs(dir) {
   return fs.existsSync(path.join(dir, MARK));
 }
 
+// 옛 이름: 다른 프로젝트의 덱 빌더가 옛 경로(skills/interx-deck/scripts)로 엔진을 찾으므로 scripts 만 새 폴더로 연결.
+// plugin.json 이 없어야 두 폴더가 같은 플러그인 이름으로 겹치지 않음. 그 빌더를 고친 뒤 이 함수와 호출, 제거 줄을 지움
+function linkOld() {
+  const stale = OLD + ".old";
+  try {
+    if (fs.existsSync(OLD)) {
+      if (!ownedByUs(OLD)) return step("옛 이름", true, `${OLD} 는 직접 둔 폴더라 그대로`);
+      fs.rmSync(stale, { recursive: true, force: true });
+      fs.renameSync(OLD, stale);   // 다른 프로그램이 잡고 있으면 여기서 멈추고 옛 폴더는 그대로 남음
+    }
+    fs.mkdirSync(OLD, { recursive: true });
+    fs.symlinkSync(path.join(DEST, "scripts"), path.join(OLD, "scripts"), "junction");
+    fs.writeFileSync(path.join(OLD, MARK), "연결용 폴더\n");
+    fs.rmSync(stale, { recursive: true, force: true });
+    step("옛 이름", true, "interx-deck/scripts 연결을 둠 (잠시 유지)");
+  } catch (e) {
+    if (!fs.existsSync(OLD) && fs.existsSync(stale)) fs.renameSync(stale, OLD);   // 실패하면 옛 폴더를 되돌림
+    step("옛 이름", false, `연결을 만들지 못함 (${e.code || e.message}): ${OLD} 를 쓰는 프로그램을 닫고 다시 실행`);
+  }
+}
+
+// 옛 개인 설정 폴더(~/.claude/interx-deck)를 새 폴더로 합침: 새 폴더에 없는 것만 옮김
+const OLD_CFG = path.join(CLAUDE, "interx-deck");
+function mergeDir(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const n of fs.readdirSync(src)) {
+    const a = path.join(src, n), b = path.join(dst, n);
+    if (fs.statSync(a).isDirectory() && fs.existsSync(b) && fs.statSync(b).isDirectory()) mergeDir(a, b);
+    else if (!fs.existsSync(b)) fs.renameSync(a, b);
+  }
+  try { fs.rmdirSync(src); } catch { /* 안 비었으면 그대로 */ }
+}
+function migrateProfile() {
+  if (!fs.existsSync(OLD_CFG)) return;
+  try {
+    mergeDir(OLD_CFG, path.join(CLAUDE, "ixdeck"));
+    step("개인 설정", true, "~/.claude/ixdeck 로 옮김");
+  } catch (e) {
+    step("개인 설정", false, `옮기지 못함 (${e.code || e.message}): ${OLD_CFG} 의 파일을 쓰는 프로그램을 닫고 다시 실행`);
+  }
+}
+
 function install() {
   if (!ownedByUs(DEST)) fail(`${DEST} 가 이미 있음 (npx 로 설치한 폴더 아님). 옮긴 뒤 다시 실행`);
   const markFile = path.join(DEST, MARK);
@@ -209,20 +252,24 @@ function install() {
   fs.renameSync(tmp, DEST);
   step("플러그인", true, old ? `업데이트 ${old} → ${PKG.version}` : `설치 ${PKG.version}`);
   console.log(`    ${dim("└ " + DEST)}`);
+  linkOld();
+  migrateProfile();
   checks();
   console.log();
-  console.log(`  ${grad("❯❯", [255, 190, 90], ORANGE)} Claude Code 를 다시 시작하고 ${bold("/interx-deck:using")}`);
+  console.log(`  ${grad("❯❯", [255, 190, 90], ORANGE)} Claude Code 를 다시 시작하고 ${bold("/ixdeck:using")}`);
   console.log();
 }
 
 function uninstall() {
-  if (!fs.existsSync(DEST)) return step("플러그인", true, "설치된 것이 없음");
-  if (!ownedByUs(DEST)) fail(`${DEST} 는 npx 로 설치한 폴더가 아니라 지우지 않음`);
-  fs.rmSync(DEST, { recursive: true, force: true });
-  step("플러그인", true, "제거 (개인 설정은 남김)");
+  const had = fs.existsSync(DEST);
+  if (had && !ownedByUs(DEST)) fail(`${DEST} 는 npx 로 설치한 폴더가 아니라 지우지 않음`);
+  if (had) fs.rmSync(DEST, { recursive: true, force: true });
+  const mark = path.join(OLD, MARK);   // 옛 이름 자리: 우리가 만든 것(1.7.1 의 옛 설치 또는 연결용 폴더)만 지움
+  if (fs.existsSync(mark) && !fs.existsSync(path.join(OLD, ".git"))) fs.rmSync(OLD, { recursive: true, force: true });
+  step("플러그인", true, had ? "제거 (개인 설정은 남김)" : "설치된 것이 없음");
 }
 
-const PY_PKGS = "python-pptx lxml pillow pdfplumber";
+const PY_PKGS = "python-pptx lxml pillow pdfplumber openpyxl";
 const run = (c) => {
   try {
     execSync(c, { stdio: "ignore" });
@@ -252,7 +299,7 @@ function ensurePython() {
     py = findPython();
   }
   if (!py) return step("Python", false, "설치 실패: python.org 에서 3.11 이상 설치 후 다시 실행");
-  const has = () => run(`${py} -c "import pptx, lxml, PIL, pdfplumber"`);
+  const has = () => run(`${py} -c "import pptx, lxml, PIL, pdfplumber, openpyxl"`);
   if (!has()) {
     busy("Python 패키지 설치 중");
     // 쓰기 불가면 pip 이 사용자 범위로 설치

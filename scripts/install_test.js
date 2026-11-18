@@ -13,9 +13,18 @@ const env = { ...process.env, CLAUDE_CONFIG_DIR: cfg };
 const run = (args) => execSync(`npx --yes --allow-git=all muramasaDev/interx-deck-skill#${ver} ${args}`,
   { env, stdio: "inherit", cwd: cfg });
 try {
+  // 1.7.1 이전 상태를 흉내: 옛 설치 폴더(표지 있음)와 옛 개인 설정을 두고, 새 개인 설정 폴더가 먼저 생겨 있는 경우
+  fs.mkdirSync(path.join(cfg, "skills", "interx-deck"), { recursive: true });
+  fs.writeFileSync(path.join(cfg, "skills", "interx-deck", ".installed-by-npm"), "1.7.1\n");
+  fs.mkdirSync(path.join(cfg, "interx-deck", "profile"), { recursive: true });
+  fs.writeFileSync(path.join(cfg, "interx-deck", "profile", "profile.json"), "{}");
+  fs.mkdirSync(path.join(cfg, "ixdeck"), { recursive: true });
   run("");
   run("doctor");
-  const got = JSON.parse(fs.readFileSync(path.join(cfg, "skills", "interx-deck", ".claude-plugin", "plugin.json"), "utf8")).version;
+  for (const f of [["skills", "interx-deck", "scripts", "ixdeck.py"], ["ixdeck", "profile", "profile.json"]])
+    if (!fs.existsSync(path.join(cfg, ...f))) throw new Error(`${f.join("/")} 가 없음 (옛 판에서 올리기 실패)`);
+  if (fs.existsSync(path.join(cfg, "skills", "interx-deck", ".claude-plugin"))) throw new Error("옛 이름 자리에 plugin.json 이 있음");
+  const got = JSON.parse(fs.readFileSync(path.join(cfg, "skills", "ixdeck", ".claude-plugin", "plugin.json"), "utf8")).version;
   if ("v" + got !== ver) throw new Error(`설치된 판 ${got} 이 ${ver} 와 다름`);
   console.log(`설치 시험 통과: ${ver} (${cfg})`);
 } catch (e) {

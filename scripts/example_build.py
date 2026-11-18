@@ -5,17 +5,17 @@ import sys
 import tempfile
 
 def _engine():
-    """엔진 위치: INTERX_DECK_ROOT, skills, plugins 순"""
+    """엔진 위치: INTERX_DECK_ROOT, skills, plugins 순 (옛 이름 interx-deck 도 찾음)"""
     import glob
     cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
     roots = ([os.environ["INTERX_DECK_ROOT"]] if os.environ.get("INTERX_DECK_ROOT") else []) + \
-        [os.path.join(cfg, "skills", "interx-deck")] + \
-        sorted(glob.glob(os.path.join(cfg, "plugins", "cache", "*", "interx-deck", "*")),
+        [os.path.join(cfg, "skills", n) for n in ("ixdeck", "interx-deck")] + \
+        sorted((g for n in ("ixdeck", "interx-deck") for g in glob.glob(os.path.join(cfg, "plugins", "cache", "*", n, "*"))),
                key=os.path.getmtime, reverse=True)
     for r in roots:
         if os.path.exists(os.path.join(r, "scripts", "ixdeck.py")):
             return os.path.join(r, "scripts")
-    sys.exit("interx-deck 엔진을 찾지 못함: 플러그인을 설치하거나 INTERX_DECK_ROOT 를 준다")
+    sys.exit("ixdeck 엔진을 찾지 못함: 플러그인을 설치하거나 INTERX_DECK_ROOT 를 준다")
 
 
 sys.path.insert(0, _engine())

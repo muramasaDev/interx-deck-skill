@@ -1,11 +1,11 @@
 ---
 name: design
-description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구성도, 아키텍처도, 데이터 흐름도, 처리 순서 번호가 붙은 흐름, AAS 구조도, INTERX 설계 문서 양식, 손으로 그린 것처럼 도형과 붙은 연결선), 그리고 다른 양식 문서(사내 PM03 전사 문서: 요구사항정의서, 기능설계서, 표준데이터셋정의서, 데이터수집설계서 등)에 넣을 본문 장(parts_only). 공통 규칙은 interx-deck:using 을 먼저 읽는다. "구성도", "아키텍처도", "흐름도", "PM03 문서" 요청.
+description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구성도, 아키텍처도, 데이터 흐름도, 처리 순서 번호가 붙은 흐름, AAS 구조도, INTERX 설계 문서 양식, 손으로 그린 것처럼 도형과 붙은 연결선), 그리고 다른 양식 문서(사내 PM03 전사 문서: 요구사항정의서, 기능설계서, 표준데이터셋정의서, 데이터수집설계서 등)에 넣을 본문 장(parts_only). 공통 규칙은 ixdeck:using 을 먼저 읽는다. "구성도", "아키텍처도", "흐름도", "PM03 문서" 요청.
 ---
 
-# interx-deck:design: 설계 문서와 구성도
+# ixdeck:design: 설계 문서와 구성도
 
-공통 규칙은 `interx-deck:using`. 엔진 `${CLAUDE_PLUGIN_ROOT}/scripts/ixdeck.py`, 출발 파일 `scripts/example_build.py` 의 구성도 장.
+공통 규칙은 `ixdeck:using`. 엔진 `${CLAUDE_PLUGIN_ROOT}/scripts/ixdeck.py`, 출발 파일 `scripts/example_build.py` 의 구성도 장.
 
 ## 0. 회사 방법론 먼저
 - 설계 문서, 제안, 수행계획서는 `references/A1_방법론.md` (INTERX 제조 AI 및 데이터 분석 방법론 A1, 전략 수립 절차서) 를 먼저 읽고 장 순서와 용어를 맞춤
@@ -22,6 +22,14 @@ description: INTERX 회사 양식 설계 문서와 구성도 장 (시스템 구�
 | `Col.levels(지금 단계 0 ~ 3)` | 수준 단계 띠 (L1 ~ 2 모니터링, L3 제어, L4 최적화, L5 자율운영) |
 
 - 자율 공장 목표 수치(생산성 200% 등)는 근거 자료가 없는 회사 목표라 인용하면 '회사 목표 수치' 로 밝힘
+
+## 0-2. 기능 상세 및 화면 상세 장 (설계서, 표 중심)
+- 기능 하나는 `d.func_page(소제목, 요약, flow=[...], limits=[...], io=[...], errors=[...], refs={...})`, 화면 하나는 `d.screen_page(소제목, 요약, image=, marks=, elements=, rules=, refs=)` (엔진 `ixdoc.py`)
+- 있는 구역만 패널이 되고 패널 너비는 내용 양으로 정함. `func_page` 는 행이 적으면 행을 넉넉하게, 많으면 촘촘하게 자동 조정 (`screen_page` 는 고정). 오류 표의 화면 문구 중 서술체 검사에 걸리는 것은 자동으로 검사 예외, 그 밖의 화면 문구는 `d.allow_text("문구")`
+- 한계 값은 글 목록이 아니라 `limit_table` (값 열은 남색 굵은 글씨), 입출력은 `field_table`, 오류는 `error_table` (코드는 3자리 숫자 또는 대문자 식별자), 화면 요소는 `element_table` (번호가 캡처의 번호 원과 같아야 하고 어긋나면 오류), 관련 번호는 `ref_table`, 처리 순서는 `flow`
+- 표 칸이 줄 바꿈되면 그 행만 높아짐. 칸이 비면 오류 (없으면 `-`)
+- 같은 틀이 연달아 나오지 않게: 구역이 다른 기능끼리 묶고, 흐름이 핵심인 기능은 `chevrons` 를 쓴 장으로 따로 만듦
+- 구성도를 새로 그릴 때는 `references/구성도_레퍼런스_문법.md` 를 먼저 읽음 (역할 색 칩 `role_box`, 블록 화살표 `block_arrow`, 프로토콜 알약 `pill`, 약어 풀이 `abbr_legend`)
 
 ## 1. 구성도 장 (`d.page(..., doc=True)`)
 ```python
@@ -46,7 +54,7 @@ link(s, core, lake, color=ACCENT, text="HTTP", step=(2, "전송"), cond="조건 
 
 ## 1-2. 구성도 문법 (공개 아키텍처 그림 공통 관찰)
 - 영역: 왼쪽 현장(설비, EdgePC), 오른쪽 서버. 세 계층 머리는 같은 네모 띠와 같은 글자 크기, 색만 다름(설비 먹색, EdgePC 옅은 회청, 서버 남색)
-- 선 색은 한 장에 둘까지 (끊김 및 실패 경로 빨강은 따로): 주 흐름 남색 실선, 나머지 회색. 종류 구분은 선 모양(실선, `dash`, `sysDot`)과 범례로. 셋 넘으면 저장 때 주의
+- 선 색은 한 장에 의미 셋까지 (끊김 및 실패 경로 빨강은 따로): 데이터 흐름 남색 실선, 제어 흐름, 굵은 공통 버스. 종류 구분은 선 모양(실선, `dash`, `sysDot`)과 범례로. 넷부터 저장 때 주의
 - 아이콘은 한 장에 한 세트: 두 색 구성도 세트(server_rack, pc, user, firewall, router, edge_box, plc_unit 등) 또는 옛 색 아이콘. 섞이면 저장 때 주의
 - 아이콘 아래 이름(`icon(..., name=)`, `g.source`), 읽는 순서는 번호 원(`step=`, `step_by`)
 - 그림 제목: `d.page(..., doc=True, figure="구성도 제목")` 이 저장 때 도식 아래 가운데에 `[그림 번호. 제목]` (도식 아래 0.3 in 비움, `DocGrid(bottom=)` 를 줄임)
@@ -55,7 +63,7 @@ link(s, core, lake, color=ACCENT, text="HTTP", step=(2, "전송"), cond="조건 
 - 선은 `link(s, a, b, color, text=선 이름, step=(번호, 설명), cond=조건)`. 마주 보는 변, 상자를 뚫지 않음, 곧은 선 > ㄱ 자 > ㄷ 자. 주 흐름부터 긋는다
 - 여러 원천을 한 상자로 `fan(s, 상자, g.icons, ...)`, 상자에 붙는 번호 `step_by(s, 상자, n, 설명)`, 변을 꼭 정할 때만 `connect(...)`
 - 번호와 선 이름은 저장 직전에: 선 바로 옆 > 선에서 0.6 in 안(테두리 안) > 그래도 없으면 테두리를 걸침
-- 선 옆 번호 원은 0.15 in 7.26pt. 흐름 색: 기본 GRAY 1.5pt, 주 ACCENT(남색). 그 밖의 흐름은 GRAY 의 선 모양으로 (색 둘까지). 주황은 쓰지 않음. 아래 번호 범례 줄은 만들지 않는다
+- 선 옆 번호 원은 0.15 in 7.26pt. 흐름 색: 기본 GRAY 1.5pt, 주 ACCENT(남색). 그 밖의 흐름은 GRAY 의 선 모양으로 (색 셋까지). 주황은 쓰지 않음. 아래 번호 범례 줄은 만들지 않는다
 
 ## 2-2. Mermaid 로 간단한 흐름과 순서 그리기
 ```python

@@ -1,9 +1,9 @@
 ---
 name: okr
-description: 월간 Individual OKR 덱(회사 표준 양식 IX-SF-001) 작성. 지난달 덱을 이어받아 당월 실적(Review, 달성현황)과 익월 계획을 채우고, 요청하면 산출물 캡처를 Appendix 로 넣는다. 설정 파일 없이 지난달 덱에서 작성자, 계획, KR 행을 읽고 작업 폴더의 git 기록과 연결된 Jira, 캘린더에서 실적 근거를 모은다. "OKR", "Individual OKR", "월간 OKR", "OKR 덱", "OKR 작성", "OKR 상신", "실적 채워줘", "다음 달 계획 넣어줘", "지난달처럼 이번 달 것도" 요청이면 반드시 이 스킬을 쓴다. 일반 보고서, 주간보고는 interx-deck:report.
+description: 월간 Individual OKR 덱(회사 표준 양식 IX-SF-001) 작성. 지난달 덱을 이어받아 당월 실적(Review, 달성현황)과 익월 계획을 채우고, 요청하면 산출물 캡처를 Appendix 로 넣는다. 설정 파일 없이 지난달 덱에서 작성자, 계획, KR 행을 읽고 작업 폴더의 git 기록과 연결된 Jira, 캘린더에서 실적 근거를 모은다. "OKR", "Individual OKR", "월간 OKR", "OKR 덱", "OKR 작성", "OKR 상신", "실적 채워줘", "다음 달 계획 넣어줘", "지난달처럼 이번 달 것도" 요청이면 반드시 이 스킬을 쓴다. 일반 보고서, 주간보고는 ixdeck:report.
 ---
 
-# interx-deck:okr: 월간 Individual OKR 덱
+# ixdeck:okr: 월간 Individual OKR 덱
 
 자유 디자인이 아니라 양식 칸 채우기다. 지난달 덱의 레이아웃과 서식을 그대로 두고 내용만 갈아 끼운다.
 필요한 정보는 지난달 덱과 연결된 폴더, 서비스에서 찾는다. 사용자에게는 정말 없는 것만 묻는다.
@@ -41,11 +41,11 @@ description: 월간 Individual OKR 덱(회사 표준 양식 IX-SF-001) 작성. �
 2. **지난달 덱**: 받은 파일 → 없으면 `find` → Drive 연결이 있으면 `title contains 'OKR_Individual'` 검색. 여러 개면 가장 최근 월
    - 디자인은 사용자 본인의 지난달 덱을 그대로 쓴다. build 의 첫 인자는 늘 지난달 덱이다
    - Google Slides 만 있으면 "파일 > 다운로드 > Microsoft PowerPoint" 로 받아 달라고 한 줄 요청한다. 받기 전에는 빌드하지 않는다
-   - 덱이 하나도 없는 첫 달: 회사에서 받은 빈 양식을 쓰고, 이때만 Vision, Mission, Company OKR, 작성자를 묻는다. 작성자 기본값은 `~/.claude/interx-deck/profile/profile.json`. 형식은 `references/spec_example.json`
+   - 덱이 하나도 없는 첫 달: 회사에서 받은 빈 양식을 쓰고, 이때만 Vision, Mission, Company OKR, 작성자를 묻는다. 작성자 기본값은 `~/.claude/ixdeck/profile/profile.json`. 형식은 `references/spec_example.json`
 3. **덱에서 읽기**: `read` 로 작성자, 이번 달 계획, KR 행, 지난달 실적
 4. **근거 모으기** (있는 것만, 사람마다 출처가 다르다)
    - 대화로 받은 메모, 보고서, 회의록이 먼저
-   - 작업 폴더: `evidence YYYY-MM <폴더...>`. `~/.claude/interx-deck/profile/okr/repos.json` 이 있으면 그 경로들도 넣는다. 작성자는 저장소 설정과 덱의 이름으로 자동 판별
+   - 작업 폴더: `evidence YYYY-MM <폴더...>`. `~/.claude/ixdeck/profile/okr/repos.json` 이 있으면 그 경로들도 넣는다. 작성자는 저장소 설정과 덱의 이름으로 자동 판별
    - 연결된 서비스(ToolSearch 로 확인, 없으면 건너뜀)
      - 캘린더: 데모, 시연, 회의 주관 여부는 여기서만 확인된다
      - Jira: `(assignee = currentUser() OR reporter = currentUser()) AND updated >= <월초>`. 상태만 바뀐 옛 티켓이 섞이니 커밋, 문서로 뒷받침되는 것만

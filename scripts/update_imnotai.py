@@ -12,7 +12,7 @@ RAW = f"https://raw.githubusercontent.com/{REPO}/main/"
 FILES = {"LICENSE": "LICENSE",
          "lexicon.json": "skills/humanize-korean/references/lexicon.json",
          "quick-rules.md": "skills/humanize-korean/references/quick-rules.md"}
-DEST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "third_party", "im-not-ai")
+DEST = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "third_party", "im-not-ai")
 
 
 def valid_lexicon(raw):

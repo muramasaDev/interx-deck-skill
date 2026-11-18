@@ -11,7 +11,7 @@ import sys
 from pptx import Presentation
 from pptx.util import Emu
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, HERE)
 from ixdeck import PROFILE_DIR  # noqa: E402
 

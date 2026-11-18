@@ -6,7 +6,7 @@ import sys
 from pptx import Presentation
 from pptx.util import Emu
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from check_ban import slide_texts, texts  # noqa: E402
 
 

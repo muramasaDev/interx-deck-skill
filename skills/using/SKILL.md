@@ -1,14 +1,14 @@
 ---
 name: using
-description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 공통 규칙과 갈래 고르기. 어느 갈래(interx-deck:report 보고 자료, interx-deck:design 설계 문서와 구성도와 다른 양식 문서의 본문, interx-deck:okr 월간 Individual OKR)를 쓸지, 작성자 묻기, 덱 구성(표지, 목차, 본문, Thank you), 제목, 글꼴 Noto Sans KR, 줄 바꿈, 글쓰기와 내용 규칙, 색, 아이콘, 관문(gate.py), DRM 주의. "INTERX 양식", "회사 양식 PPT", "PPT 만들어줘", "덱 만들어줘" 요청에 먼저 쓴다.
+description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 공통 규칙과 갈래 고르기. 어느 갈래(ixdeck:report 보고 자료, ixdeck:design 설계 문서와 구성도와 다른 양식 문서의 본문, ixdeck:okr 월간 Individual OKR)를 쓸지, 작성자 묻기, 덱 구성(표지, 목차, 본문, Thank you), 제목, 글꼴 Noto Sans KR, 줄 바꿈, 글쓰기와 내용 규칙, 색, 아이콘, 관문(gate.py), DRM 주의. "INTERX 양식", "회사 양식 PPT", "PPT 만들어줘", "덱 만들어줘" 요청에 먼저 쓴다.
 ---
 
-# interx-deck: 공통 규칙과 갈래
+# ixdeck: 공통 규칙과 갈래
 
 엔진과 자산은 플러그인 폴더 `${CLAUDE_PLUGIN_ROOT}/` 에 하나뿐이다. 아래에서 `scripts/`, `assets/` 는 이 폴더 기준.
 
 ## 개인 설정 (플러그인 밖, 사람마다)
-- 위치 `~/.claude/interx-deck/profile/`. 플러그인을 새 판으로 바꿔도 남는다
+- 위치 `~/.claude/ixdeck/profile/`. 플러그인을 새 판으로 바꿔도 남는다
   - `profile.json`: 작성자 {team, name, title}
   - `okr/repos.json`: OKR 근거를 모을 폴더 목록 (선택)
   - `projects/<과제>/README.md`: 그 과제만의 규칙(경로, 문서 번호, 양식 원본 위치, 마스킹 규칙). 그 과제 덱을 만들 때 공통 규칙 다음에 읽는다
@@ -20,9 +20,10 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 ## 0. 갈래 고르기
 | 만드는 것 | 갈래 |
 |---|---|
-| 보고 자료, 결과 보고, 과제 개요, 수행계획, 착수 보고, 고객 보고, 주간보고, 성능 비교, 화면 설명 | `interx-deck:report` |
-| 설계 문서, 시스템 구성도, 아키텍처도, 데이터 흐름도, AAS 구조도, 다른 양식 문서(PM03 등)의 본문 장 | `interx-deck:design` |
-| 월간 Individual OKR 덱 (IX_OKR_Individual_OKR) | `interx-deck:okr` (전월 덱을 틀로 쓰는 다른 엔진. 아래 2 ~ 6절 대신 그 스킬의 규칙) |
+| 보고 자료, 결과 보고, 과제 개요, 수행계획, 착수 보고, 고객 보고, 주간보고, 성능 비교, 화면 설명 | `ixdeck:report` |
+| 설계 문서, 시스템 구성도, 아키텍처도, 데이터 흐름도, AAS 구조도, 다른 양식 문서(PM03 등)의 본문 장 | `ixdeck:design` |
+| 월간 Individual OKR 덱 (IX_OKR_Individual_OKR) | `ixdeck:okr` (전월 덱을 틀로 쓰는 다른 엔진. 아래 2 ~ 6절 대신 그 스킬의 규칙) |
+| 정의서 xlsx (테이블, API, 개발 기능 항목, 화면 정의서, 추적 매트릭스) | `ixdeck:sheet` (엔진 `ixsheet.py`, 검사 `sheet_check.py`, 그림 `xlsx_view.py`) |
 - 한 덱에 보고형 장과 구성도 장이 섞이면 report 와 design 을 같이 읽는다 (엔진, 관문이 같음)
 
 ## 1. 목적과 범위
@@ -38,13 +39,13 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 2. 절과 장: `d.section("절 이름")` 다음 `d.page("장 주제", lead="요약 한 줄", doc=구성도면 True)`. 한 장에 메시지 하나
 3. 자리는 자동 배치 함수로만 (`report_panels`, `DocGrid`). 좌표를 손으로 쓰지 않는다. 단위 인치
 4. **`python -P scripts/gate.py <build.py> <장 수>`** (Mac 은 `python3`) 가 "결과: 통과" 할 때까지 고친다. 기준을 낮추지 않는다(`strict=False`, `--soft` 는 자체 시험 전용). 렌더는 장 XML 해시(렌더 폴더 `hashes.json`)로 바뀐 장만 다시 그리고 나머지는 이전 PNG 를 씀(장 수나 틀이 바뀌면 전체, PDF 는 항상 전체). 장 순서는 presentation.xml 의 장 목록 순서, 틀 해시는 레이아웃, 마스터, 테마와 그 관계 파일, media, presentation.xml, 렌더 스크립트(render.py, render.ps1)를 포함
-   - build 없이 기존 pptx(`edit_deck.py` 결과, 받은 덱)를 넘길 때: `python -P scripts/gate.py --deck 덱.pptx [장 수]` 가 같은 검사, 렌더, `text.md`, `titles.md`, PDF, `.gate.json` 을 수행 (파일 이름 규칙도 검사)
+   - build 없이 기존 pptx(`edit_deck.py` 결과, 받은 덱)를 넘길 때: `python -P scripts/gate.py --deck 덱.pptx [장 수]` 가 같은 검사, 렌더, `text.md`, `titles.md`, PDF, 통과 기록을 만드는 것 (파일 이름 규칙도 검사)
 5. 렌더 그림을 9절 장 검토 목록으로 본다
 6. **사람이 쓴 덱 검토**: 관문이 만든 `text.md`, `titles.md`(장별 소제목 및 요약 줄만), `sheet.png` 와 `third_party/im-not-ai/quick-rules.md` 로 `references/review_prompt.md` 지시문을 검토 에이전트에 준다. 고칠 곳을 모두 고치고 관문을 다시 돌린 뒤 새 에이전트로 같은 검토를 되풀이한다
    - '그대로 사용 가능' 이면 넘긴다. 3번 되풀이해도 남으면 남은 표를 사용자에게 보여 주고 넘긴다 (검토자는 회마다 더 작은 것을 찾으므로 끝없이 돌리지 않음)
    - 고칠 때 아래 '검토에서 자주 나온 결함' 을 덱 전체에 한 번에 적용한다
 7. 넘기기 전 사실 정확성 검토 1건 (원천 대조). 6과 같은 에이전트에 근거 자료 경로를 주면 한 번에 끝낼 수 있음
-8. **넘기기 전 `python -P scripts/gate.py --verify 덱.pptx`** 가 '통과 기록과 같음' 이어야 함. 관문 통과 때 pptx 옆에 `<이름>.gate.json`(sha256, 시각, 판 번호, 결과)이 생기고, 통과 뒤 pptx 를 고쳤으면 '다름' (종료 코드 1)
+8. **넘기기 전 `python -P scripts/gate.py --verify 덱.pptx`** 가 '통과 기록과 같음' 이어야 함. 관문 통과 때 통과 기록(sha256, 시각, 판 번호, 결과)이 개인 설정 폴더 `gate/` 에 생기고 (납품 폴더에는 기록 파일을 남기지 않음, 덱 옆의 옛 `.gate.json` 은 다음 관문 때 치움), 통과 뒤 pptx 를 고쳤으면 '다름' (종료 코드 1)
 
 **만든 pptx 를 PowerPoint COM 으로 직접 열지 않는다.** 회사 DRM 이 암호화한다(SCDSA004). render.py 는 버리는 사본만 연다. 최종본은 PDF 로 보낸다. 관문이 pptx 옆에 같은 이름의 PDF 를 만든다 (`render.py --pdf`). 외부 서비스에 보낸 내용은 보관될 수 있으니 회사 데이터, 고객명, 설비명은 공개 범위가 정해지기 전에 내보내지 않는다.
 
@@ -183,7 +184,7 @@ description: INTERX 회사 양식 PPT 를 만들거나 고칠 때 먼저 읽는 
 | check_text.py | AI 투 수식어, 서술체, 느낌표 (실패), 의인화, 명사 잇기, 긴 줄, im-not-ai 바꿀 어휘, 날짜 표기 3종 이상 혼용 (주의). 발표자 노트도 검사(서술체 제외) |
 | deck_text.py | 장마다 글을 읽는 순서로 `text.md` 에, 장별 소제목 및 요약 줄만 `titles.md` 에 (사람이 쓴 덱 검토용) |
 | render.py | 장마다 PNG, 모아 보기 sheet.png (임시 폴더 `interx_gate/<덱>/`), pptx 옆 PDF. Windows 는 PowerPoint, Mac 은 PowerPoint 또는 LibreOffice. Noto Sans KR 이 없으면 종료 코드 3 으로 멈춤 (글꼴 폴더 파일, Windows 글꼴 등록 값(HKLM, HKCU), Mac 은 fc-list 로 확인) |
-| gate.py --verify | 덱 해시를 통과 기록(`<이름>.gate.json`)과 대조. 같으면 종료 코드 0 |
+| gate.py --verify | 덱 해시를 통과 기록(개인 설정 폴더 `gate/`)과 대조. 같으면 종료 코드 0 |
 - build.py 마지막 줄은 `print(OUT)`
 - **장 검토 목록** (자동 검사가 못 보는 것): 장마다 메시지 하나와 그 요약 줄, 선 흐름과 번호 순서, 같은 것은 같은 이름과 색과 아이콘, 빈 칸을 행 높이나 큰 글자로 메우지 않음, 빈 곳을 블록으로 채우지 않음 (패널이 내용에 맞춰 줄어듦), 캡처 네모가 맞는 자리, 목차가 핵심만 담음, 처음 보는 사람이 이해함
 

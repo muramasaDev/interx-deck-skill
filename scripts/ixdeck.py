@@ -20,7 +20,7 @@ from pptx.util import Emu, Inches, Pt
 
 from check_ban import SRC_LINE, slide_texts
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 ASSETS = os.path.join(os.path.dirname(HERE), "assets")
 TEMPLATE = os.path.join(ASSETS, "interx_template.pptx")
 ICONS = os.path.join(ASSETS, "icons")
@@ -445,8 +445,8 @@ def table_caption(s, x, y, w, title, unit=None, rows=None, key=None):
         u = text(s, x + w - uw, y, uw, 0.2, f"(단위: {unit})", size=6.35, color=SLATE9, align="r")
         u.name = "IXUNIT"
         _obst(s, u)
-    elif rows and sum(bool(_NUM_CELL.match(str(c).strip())) and not _YEAR.match(str(c).strip())
-                      for r in rows[1:] for c in r[1:]) >= 2:   # 첫 열(항목, 순번) 제외
+    elif rows and "단위" not in rows[0] and sum(bool(_NUM_CELL.match(str(c).strip())) and not _YEAR.match(str(c).strip())
+                                               for r in rows[1:] for c in r[1:]) >= 2:   # 첫 열 제외, 단위 열이 있으면 통과
         _warn(s, f"숫자 표 '{title}' 에 단위 없음: unit='건, %' (표 오른쪽 위에 (단위: ...))")
 
 
@@ -456,11 +456,14 @@ def figure_caption(s, title, x, y, w, key=None):
 
 
 def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, header_color=WHITE,
-          highlight=(), align=None, cell_hl=()):
-    """rows[0] 머리행. highlight: 남색 행, cell_hl: 남색 칸"""
+          highlight=(), align=None, cell_hl=(), row_hs=None):
+    """rows[0] 머리행. highlight: 남색 행, cell_hl: 남색 칸, row_hs: 데이터 행마다 높이 (없으면 모두 row_h)"""
     nr, nc = len(rows), len(col_w)
     head_h = min(row_h, 0.27)
-    gf = s.shapes.add_table(nr, nc, Inches(x), Inches(y), Inches(sum(col_w)), Inches(head_h + row_h * (nr - 1)))
+    hs = list(row_hs) if row_hs else [row_h] * (nr - 1)
+    if len(hs) != nr - 1:
+        raise ValueError(f"table row_hs {len(hs)}개: 데이터 행 {nr - 1}개와 같아야 함")
+    gf = s.shapes.add_table(nr, nc, Inches(x), Inches(y), Inches(sum(col_w)), Inches(head_h + sum(hs)))
     _obst(s, gf)
     tbl = gf.table
     tblpr = tbl._tbl.tblPr
@@ -471,7 +474,7 @@ def table(s, x, y, col_w, rows, size=7.26, row_h=0.24, header_fill=TBL_HEAD, hea
     for j, w in enumerate(col_w):
         tbl.columns[j].width = Inches(w)
     for i in range(nr):
-        tbl.rows[i].height = Inches(head_h if i == 0 else row_h)
+        tbl.rows[i].height = Inches(head_h if i == 0 else hs[i - 1])
         for j in range(nc):
             c = tbl.cell(i, j)
             c.margin_left = c.margin_right = Inches(0.06)
@@ -2443,11 +2446,11 @@ def _number_captions(slides):
 
 
 def diagram_notes(s):
-    """구성도 문법 주의: 선 색은 주 흐름과 보조 흐름 둘까지, 아이콘은 한 세트"""
+    """구성도 문법 주의: 선 색은 의미 셋까지 (데이터 흐름, 제어 흐름, 굵은 공통 버스, 빨강 끊김은 별도), 아이콘은 한 세트"""
     out = []
     cols = set(s._element.xpath(".//p:cxnSp/p:spPr/a:ln/a:solidFill/a:srgbClr/@val")) - {RED}   # 빨강은 끊김 표시
-    if len(cols) > 2:
-        out.append(f"연결선 색 {len(cols)}종 ({', '.join(sorted(cols))}): 주 흐름 실선과 보조 흐름 점선 둘까지, 구분은 선 모양으로")
+    if len(cols) > 3:
+        out.append(f"연결선 색 {len(cols)}종 ({', '.join(sorted(cols))}): 의미 셋(데이터, 제어, 공통 버스)까지, 나머지 구분은 선 모양으로, 색마다 범례")
     keys = _reg(s).get("icon_keys", set())
     icons = {k for k in keys if any(os.path.splitext(f)[0] == k for f in _icon_files())}
     duo = _duo_keys()
@@ -3080,8 +3083,7 @@ def _apply_ko_breaks(sl):
                 prev = nr
 
 
-PROFILE_DIR = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude"),
-                           "interx-deck", "profile")   # 개인 설정 (플러그인 밖)
+from ixpaths import PROFILE_DIR  # noqa: E402  개인 설정 (플러그인 밖)
 
 
 def _template_fresh(template):
@@ -3476,3 +3478,7 @@ class Deck:
         self.prs.save(path)
         normalize_fonts(path)
         return path
+
+
+import ixdoc  # noqa: E402,F401  설계 문서 부품을 Col 과 Deck 에 붙임 (ixdoc.py)
+from ixdiag import *  # noqa: E402,F401,F403  구성도 역할 부품 (ixdiag.py)

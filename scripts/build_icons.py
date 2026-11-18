@@ -10,7 +10,7 @@ import tarfile
 
 from PIL import Image, ImageDraw, ImageFont
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 ICONS = os.path.join(HERE, "..", "assets", "icons")
 LOGOS = os.path.join(HERE, "..", "assets", "logos")
 PH, TB, SI = "@phosphor-icons/core@2.1.1", "@tabler/icons@3.52.0", "simple-icons@16.38.0"

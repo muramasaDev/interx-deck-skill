@@ -1,11 +1,11 @@
 ---
 name: report
-description: INTERX 회사 양식 보고 PPT (보고 자료, 결과 보고, 과제 개요, 수행계획, 착수 보고, 고객사 보고, 주간보고, 성능과 벤치마크 비교, 화면 캡처 설명, 일정, 현행 vs 개선 비교). 3열 패널 보고형 장, 핵심 문장 띠, 번호 카드, 이름표 묶음, 차트, 일정, 수식 상자, 고객 보고 구성 순서와 Appendix 예상 질문, 성능 표와 한계 표. 공통 규칙은 interx-deck:using 을 먼저 읽는다. "보고 자료", "결과보고", "PPT 만들어줘", "주간보고", "고객 보고" 요청.
+description: INTERX 회사 양식 보고 PPT (보고 자료, 결과 보고, 과제 개요, 수행계획, 착수 보고, 고객사 보고, 주간보고, 성능과 벤치마크 비교, 화면 캡처 설명, 일정, 현행 vs 개선 비교). 3열 패널 보고형 장, 핵심 문장 띠, 번호 카드, 이름표 묶음, 차트, 일정, 수식 상자, 고객 보고 구성 순서와 Appendix 예상 질문, 성능 표와 한계 표. 공통 규칙은 ixdeck:using 을 먼저 읽는다. "보고 자료", "결과보고", "PPT 만들어줘", "주간보고", "고객 보고" 요청.
 ---
 
-# interx-deck:report: 보고 자료
+# ixdeck:report: 보고 자료
 
-공통 규칙(작성자 묻기, 덱 구성, 제목, 글쓰기, 관문)은 `interx-deck:using`. 엔진 `${CLAUDE_PLUGIN_ROOT}/scripts/ixdeck.py`, 출발 파일 `scripts/example_build.py`.
+공통 규칙(작성자 묻기, 덱 구성, 제목, 글쓰기, 관문)은 `ixdeck:using`. 엔진 `${CLAUDE_PLUGIN_ROOT}/scripts/ixdeck.py`, 출발 파일 `scripts/example_build.py`.
 
 ## 0. 쓰임새 고르기 (내용 정하기 전에)
 요청에 드러나지 않으면 AskUserQuestion 으로 한 번 묻는다. 쓰임새가 구성, 정보량, 공개 범위를 정한다. 색과 양식은 같다.

@@ -4,13 +4,14 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 
 from pptx import Presentation
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from check_ban import allowed, notes_of, slide_texts  # noqa: E402
 
-LEXICON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "third_party", "im-not-ai",
+LEXICON = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "third_party", "im-not-ai",
                        "lexicon.json")
 
 # 실패: 보고서에 쓰지 않는 AI 투 수식어, 감탄, 서술체
@@ -34,6 +35,8 @@ WARN = [
     (r"성숙도 ?(레벨|단계|수준)", "방법론 용어: Level 1 ~ 5 (모니터링, 제어, 최적화, 자율운영)"),
     (r"설정 ?변수|세팅 ?변수", "방법론 용어: 셋팅변수 (X3)"),
 ]
+JOSA = {"에서", "으로", "에게", "까지", "부터", "처럼", "보다", "이며", "이고", "이나", "에는", "에도", "로서", "로써", "에서는",
+        "으로는", "에서도", "으로도"}
 # 조사, 어미로 끝나는 낱말 (명사 잇기 판단용)
 ENDS = re.compile(r"(은|는|이|가|을|를|의|에|에서|로|으로|와|과|도|만|까지|부터|보다|처럼|하여|하고|해서|하면|이면|고|며|면|서|지|게"
                   r"|음|함|임|됨|듦|및|등|중|후|전|별|당|용)$")
@@ -104,11 +107,20 @@ def check(path):
     lex, seen = (load_lexicon(), set()) if os.path.exists(LEXICON) else ([], set())
     if not lex:
         warns.append(f"어휘 사전을 못 읽음: {LEXICON}")
-    all_lines = []
+    all_lines, src_by = [], []
     for i, s in enumerate(prs.slides, 1):
         lines = [ln.strip(" •※-") for t in slide_texts(s) for ln in (ok(t) if ok else t).split("\n")
                  if ln.strip()]
         all_lines += lines
+        src_by.append({ln for ln in lines if ln.startswith("출처")})
+        if i == 1:
+            for ln in lines:
+                if re.fullmatch(r"(?:[가-힣]+ ){0,2}(설계서|정의서|보고서|계획서|제안서|명세서)", ln):
+                    warns.append(f"표지 제목 '{ln}' 에 제품이나 과제 이름이 없음: 받는 사람이 어느 문서인지 표지에서 알게")
+        for ln in lines:
+            m = re.search(r"[A-Za-z]{3,}[가-힣]{2,}", ln) if len(ln) <= 30 else None
+            if m and re.sub(r"^[A-Za-z]+", "", m.group()) not in JOSA:   # 에서, 으로 같은 두 글자 조사는 정상
+                warns.append(f"{i}쪽 '{m.group()}' 영문 뒤 한글을 붙여 씀: 띄어쓰기 ('{ln[:30]}')")
         for ln in lines:
             for pat, why in FAIL:
                 m = re.search(pat, ln)
@@ -136,6 +148,10 @@ def check(path):
         for h in set(heads):
             if heads.count(h) >= 3 and re.fullmatch(r"[가-힣]+", h):
                 warns.append(f"{i}쪽 '{h}' 로 시작하는 줄 {heads.count(h)}개: 같은 틀 되풀이")
+    rep = Counter(x for sset in src_by for x in sset)
+    for ln, n in rep.items():
+        if (prs.core_properties.category or "") == "ix-purpose:문서" and n >= 5 and n >= 0.4 * len(prs.slides):
+            warns.append(f"같은 출처 문구 {n}장 반복 ('{ln[:30]}'): 문서 정보 장에 한 번만 적고 장마다는 그 장의 근거만")
     kinds = date_kinds(all_lines)
     if len(kinds) > 2:
         warns.append(f"날짜 표기 {len(kinds)}종 혼용 ({', '.join(f'{k} {v}' for k, v in kinds.items())}): "

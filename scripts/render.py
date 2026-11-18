@@ -11,7 +11,7 @@ import sys
 import tempfile
 import uuid
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 PNG_W = 1600   # render.ps1 과 같은 폭
 
 
