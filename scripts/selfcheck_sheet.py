@@ -191,4 +191,11 @@ _cp = os.path.join(tmp, "child.xlsx")
 _ch.save(_cp)
 assert subprocess.run([sys.executable, "-P", os.path.join(HERE, "sheet_check.py"), _cp], capture_output=True).returncode == 0
 _bad(lambda: Book("시험", history=_h).table("필드", [Field("테이블 ID", "ref"), Field("순번", "num")], [("T-1", 1), ("T-1", 1)]), "하위 표 조합 중복")
+# indent=True 는 줄 맨 앞 공백을 유지 (코드 예시), 기본은 지움
+_ci = Book("시험", history=_h)
+_ci.table("예시", [Field("API ID", "ref"), Field("순번", "code"), Field("내용", "text", indent=True)], [("A-1", "1", "{"), ("A-1", "2", '    "k": 1')])
+_ip = os.path.join(tmp, "indent.xlsx")
+_ci.save(_ip)
+import openpyxl  # noqa: E402
+assert openpyxl.load_workbook(_ip)["예시"]["C4"].value == '    "k": 1'
 print("selfcheck_sheet OK")

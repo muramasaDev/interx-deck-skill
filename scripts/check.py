@@ -315,6 +315,20 @@ if _purpose == "영업":   # 첫 본문 장은 회사 소개가 아니라 변화
 _min = re.match(r"ix-minutes:([\d.]+)", _prs.core_properties.content_status or "")
 if _min and len(main) > float(_min.group(1)) / 1.5:
     print(f"주의: 본문 {len(main)}장이 발표 {_min.group(1)}분 기준 {float(_min.group(1)) / 1.5:.0f}장(1.5분당 1장)을 넘음")
+SPEECH_CPM = 330   # 한국어 발표 속도 추정: 공백을 뺀 글자 수 / 분 (추정치이며 발표자마다 다름)
+_cs = _prs.core_properties.content_status or ""
+_notes = [re.sub(r"\s", "", sl.notes_slide.notes_text_frame.text) if sl.has_notes_slide and sl.notes_slide.notes_text_frame is not None else ""
+          for sl in main]
+if "ix-notes:required" in _cs:   # 발표하는 덱: 본문 장마다 말할 내용
+    for sl, n in zip(main, _notes):
+        if len(n) < 30:
+            bad.append(f"slide{_all.index(sl) + 1}: 발표자 노트 필수 덱인데 노트가 없거나 30자 미만 (d.page(notes=...))")
+if _min and main and sum(1 for n in _notes if n) >= len(main) / 2:   # 노트가 절반 넘는 장에 있을 때만 시간을 잼
+    _est, _want = sum(len(n) for n in _notes) / SPEECH_CPM, float(_min.group(1))
+    if _est > _want * 1.1:
+        print(f"주의: 노트 분량이 약 {_est:.0f}분({sum(len(n) for n in _notes)}자, 분당 {SPEECH_CPM}자 추정)으로 발표 {_want:g}분을 넘음: 노트를 줄이거나 장을 덜어 냄")
+    elif _est < _want * 0.5:
+        print(f"주의: 노트 분량이 약 {_est:.0f}분으로 발표 {_want:g}분의 절반에 못 미침: 말할 내용이 모자라거나 노트가 빠진 장이 있음")
 _doc = _purpose == "문서"   # 문서 배포 덱은 표 비율 한도가 높음
 if len(main) >= 4 and tables > len(main) * (0.7 if _doc else 0.5):
     bad.append(f"표가 있는 본문 장 {tables}/{len(main)} (절반 넘음). 명세 표는 부록으로, 본문은 그림과 글로")

@@ -25,7 +25,7 @@ def dw(s):
 
 def line_count(text, width):
     """자동 줄 바꿈 때 줄 수 (단어 단위, 긴 단어는 글자 단위)"""
-    usable = max(width - 2, 2)
+    usable = max(width - 1, 2)
     total = 0
     for para in str(text).split("\n"):
         n, cur = 1, 0

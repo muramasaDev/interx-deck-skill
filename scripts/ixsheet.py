@@ -46,6 +46,7 @@ class Field:
     decimals: int = 0
     unit: str = None
     mapping: dict = None
+    indent: bool = False   # True 면 줄 맨 앞 공백을 지우지 않음 (코드, JSON 예시의 들여쓰기)
 
     def __post_init__(self):
         _label(self.name, "열 이름")
@@ -81,7 +82,7 @@ class Field:
             if not MIN_DATE <= v <= datetime.date(9999, 12, 31):
                 raise ValueError(f"{self.name}: 날짜는 {MIN_DATE} 부터 {v!r}")
             return v
-        v = str(v).strip()
+        v = str(v).rstrip() if self.indent else str(v).strip()
         if _CTRL.search(v):
             raise ValueError(f"{self.name}: 제어 문자가 있음 {v!r}")
         if self.kind == "status" and v not in (self.mapping or STATUS):
@@ -112,6 +113,10 @@ class Book:
             info["기준일"] = d.isoformat() if hasattr(d, "isoformat") else d
         self.table("문서 정보", [Field("항목", "text", 18), Field("내용", "text", 70)],
                    [(k, v) for k, v in info.items()])
+        for r in range(3, self.wb["문서 정보"].max_row + 1):   # 문서 정보의 항목 열은 연한 회색 칸에 굵게 가운데: 값 칸과 구분
+            c = self.wb["문서 정보"].cell(r, 1)
+            c.font, c.fill = _font(bold=True), PatternFill("solid", fgColor="F2F2F2")
+            c.alignment = Alignment(horizontal="center", vertical="center")
         self.table("개정 이력", [Field("판", "code"), Field("일자", "date"), Field("구분", "code"), Field("내용", "text", 60)],
                    history)   # 작성자 열은 두지 않음 (개정 이력 한 줄: 판, 일자, 구분, 내용)
 
@@ -165,8 +170,8 @@ class Book:
             raise ValueError(f"시트 이름 '{title}' 이 겹치거나 Excel 이 거부하는 꼴 (대소문자 무시, 앞뒤 ', History)")
         ws = self.wb.create_sheet(title)
         nc, hr = len(fields), 3 if spans else 2
-        widths = [f.width or min(60, max(8, 2 + max([dw(f.head)] + [dw(f.text(r[j])) for r in vals])))
-                  for j, f in enumerate(fields)]
+        widths = [max(f.width or min(60, max(8, 2 + max([dw(f.head)] + [dw(f.text(r[j])) for r in vals]))), dw(f.head) + 5)
+                  for j, f in enumerate(fields)]   # 머리글은 필터 단추(약 3칸) 때문에 글자 수 + 5 이상: 머리글이 두 줄로 꺾이지 않게
         for j, w in enumerate(widths, 1):
             ws.column_dimensions[L(j)].width = w
         ws.cell(1, 1, name).font = _font(size=12, bold=True)
@@ -196,7 +201,7 @@ class Book:
             for j, (f, v) in enumerate(zip(fields, row), 1):
                 c = ws.cell(r, j, v)
                 c.font, c.border = _font(), BORDER
-                c.alignment = Alignment(horizontal=ALIGN[f.kind], vertical="top", wrap_text=f.kind == "text")
+                c.alignment = Alignment(horizontal=ALIGN[f.kind], vertical="center", wrap_text=f.kind == "text")   # 세로 가운데: 한 줄 칸과 여러 줄 칸이 같은 선에 놓임
                 if isinstance(v, datetime.date):
                     c.number_format = "yyyy-mm-dd"
                 elif isinstance(v, (int, float)):

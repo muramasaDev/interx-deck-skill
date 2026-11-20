@@ -363,6 +363,31 @@ assert "'요약' 이 없음" not in _o and "주의: 본문 3장이 발표 3분" 
 assert Presentation(_pe).core_properties.category == "ix-purpose:제안"
 
 
+# 발표 노트: notes_required 는 본문 장마다 노트 30자 이상, minutes 는 노트 글자 수로 예상 시간을 잼
+def _pn(m):
+    m.page("첫째", lead="요약", notes="가" * 40)
+    m.page("둘째", lead="요약")
+
+
+_rc, _o = _py("check.py", _mini("n1", _pn, notes_required=True))
+assert _rc == 1 and "slide4: 발표자 노트 필수" in _o and "slide3: 발표자 노트 필수" not in _o, _o
+_rc, _o = _py("check.py", _mini("n2", _pn))
+assert "발표자 노트 필수" not in _o, _o   # 옵션이 없으면 노트는 선택
+
+
+def _pm(m):
+    m.page("첫째", lead="요약", notes="가나다라 " * 150)
+    m.page("둘째", lead="요약", notes="가나다라 " * 150)
+
+
+_rc, _o = _py("check.py", _mini("n3", _pm, minutes=1))   # 노트 1200자 = 약 3.6분 > 1분 x 1.1
+assert "노트 분량이 약 4분" in _o and "넘음" in _o, _o
+_rc, _o = _py("check.py", _mini("n4", _pm, minutes=10))   # 약 3.6분 < 10분 x 0.5
+assert "절반에 못 미침" in _o, _o
+_rc, _o = _py("check.py", _mini("n5", _pm, minutes=4))
+assert "노트 분량" not in _o, _o
+
+
 # check_text: 어휘 사전과 노트
 assert len(check_text.load_lexicon()) > 50, "im-not-ai 어휘 사전을 못 읽음"
 

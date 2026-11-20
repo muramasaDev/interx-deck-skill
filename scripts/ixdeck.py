@@ -3218,10 +3218,11 @@ def save_profile_author(team, name, title):
 class Deck:
     """템플릿에 새 장 추가"""
 
-    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=(), allow=(), purpose=None, minutes=None):
+    def __init__(self, author, template=TEMPLATE, parts_only=False, forbid=(), allow=(), purpose=None, minutes=None, notes_required=False):
         """parts_only: 본문만. forbid: 덱에 나가면 안 되는 정규식
         - allow: 검사에서 뺄 정규식 (화면 문구 그대로 옮긴 글 등)
-        - purpose: 쓰임새 (PURPOSES 중 하나). minutes: 발표 분"""
+        - purpose: 쓰임새 (PURPOSES 중 하나). minutes: 발표 분 (노트 글자 수로 예상 시간을 잼)
+        - notes_required: True 면 부록 아닌 본문 장마다 발표자 노트(30자 이상)가 있어야 저장 검사를 통과 (발표하는 덱)"""
         if purpose is not None and purpose not in PURPOSES:
             raise ValueError(f"purpose '{purpose}' 는 {PURPOSES} 중 하나")
         if minutes is not None and not (isinstance(minutes, (int, float)) and minutes > 0):
@@ -3241,8 +3242,9 @@ class Deck:
         self.prs.core_properties.last_modified_by = self.author
         if purpose:   # 검사 도구가 읽음
             self.prs.core_properties.category = "ix-purpose:" + purpose
-        if minutes:
-            self.prs.core_properties.content_status = f"ix-minutes:{minutes:g}"
+        flags = ([f"ix-minutes:{minutes:g}"] if minutes else []) + (["ix-notes:required"] if notes_required else [])
+        if flags:   # 검사 도구가 읽음
+            self.prs.core_properties.content_status = " ".join(flags)
         if self.allow:   # 검사 도구가 읽음
             self.prs.core_properties.keywords = "ix-allow:" + __import__("json").dumps(self.allow, ensure_ascii=False)
         self._lib = list(self.prs.slides._sldIdLst)

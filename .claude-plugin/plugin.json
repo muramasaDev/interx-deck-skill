@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "ixdeck",
-  "version": "1.7.7",
+  "version": "1.7.8",
   "description": "INTERX 회사 양식 PPT: 공통 규칙(using), 보고 자료(report), 설계 문서와 구성도(design), 월간 Individual OKR(okr), xlsx 정의서(sheet), AI 학습데이터 명세서 HTML(spec). 도형과 붙은 연결선으로 PowerPoint 에서 바로 고칠 수 있는 덱, 자동 배치, 관문 검사.",
   "author": {
     "name": "정창훈 (AX Development)"
