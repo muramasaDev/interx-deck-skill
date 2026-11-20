@@ -388,6 +388,54 @@ _rc, _o = _py("check.py", _mini("n5", _pm, minutes=4))
 assert "노트 분량" not in _o, _o
 
 
+# 그림 도형: 비율 왜곡은 실패, 큰 crop 은 주의, source_figure 는 비율을 지키고 출처와 재구성 줄을 붙임
+_ICON = os.path.join(os.path.dirname(_here), "assets", "icons", "server_rack.png")
+
+
+def _pf(m):
+    s = m.page("그림", lead="요약")
+    s.shapes.add_picture(_ICON, Inches(1), Inches(2), Inches(3), Inches(1))   # 한 변만 줄여 찌그러짐
+
+
+_rc, _o = _py("check.py", _mini("f1", _pf))
+assert _rc == 1 and "가로세로 비율이 원본과" in _o, _o
+
+
+def _pg(m):
+    s = m.page("그림", lead="요약")
+    p_ = s.shapes.add_picture(_ICON, Inches(1), Inches(2), Inches(2))
+    p_.crop_left = 0.2
+
+
+_rc, _o = _py("check.py", _mini("f2", _pg))
+assert "가장자리를 20% 자름" in _o, _o
+
+
+def _ph(m):
+    s = m.page("원본 그림", lead="요약")
+    source_figure(s, _ICON, 1, 2, 5, 4, "원본 구조", "시험 논문 (2026) Fig. 2", adapted="원본 Fig. 2 를 단순화")
+
+
+_rc, _o = _py("check.py", _mini("f3", _ph))
+assert "비율이 원본과" not in _o and "출처 줄이 없음" not in _o, _o
+_t = _mini("f4", _ph)
+_txt = " ".join(sh.text_frame.text for sh in Presentation(_t).slides[2].shapes if sh.has_text_frame)
+assert "출처: 시험 논문" in _txt and "재구성: 원본 Fig. 2 를 단순화" in _txt and "원본에 있는 결과가 아님" in _txt, _txt
+try:
+    _mini("f5", lambda m: source_figure(m.page("작은 칸", lead="요약"), _ICON, 1, 2, 5, 1.0, "제목", "출처"))
+    raise AssertionError("칸이 작으면 거부")
+except ValueError as _ex:
+    assert "축과 범례가 안 읽힘" in str(_ex), _ex
+
+
+# source_trace: 원본에 없는 숫자와 덱에 안 나오는 원본 번호
+_srcf = os.path.join(_tmp, "원본.txt")
+open(_srcf, "w", encoding="utf8").write("Figure 3 shows MAPE 12.5% on 1,250 samples. Table 2 lists baselines.")
+_rc, _o = _py("source_trace.py", _mini("t1", lambda m: m.page("결과", lead="MAPE 12.5% 로 1,250건 평가", notes="오차 9.8% 계산값, 출처 Figure 3")), _srcf)
+assert "9.8%" in _o.split("## 덱에 안 나오는")[0] and "12.5%" not in _o.split("## 덱에 안 나오는")[0], _o
+assert "Table 2" in _o and "Figure 3" not in _o.split("## 덱에 안 나오는")[-1], _o
+
+
 # check_text: 어휘 사전과 노트
 assert len(check_text.load_lexicon()) > 50, "im-not-ai 어휘 사전을 못 읽음"
 

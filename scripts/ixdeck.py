@@ -1075,6 +1075,22 @@ def screenshot(s, path, x, y, w, h, marks=(), color=RED):
     return marks_on(s, pic, marks, color)
 
 
+def source_figure(s, path, x, y, w, h, title, source, adapted=None, marks=()):
+    """원본 자료의 그림, 차트, 표 캡처를 칸(x, y, w, h) 안에 비율을 지켜 자르지 않고 넣고 아래에 [그림 #. 제목]과 출처 줄.
+    adapted: 다시 그린 것이면 원본과 달라진 점 (예: '원본 Fig. 3 을 단순화, 수치는 원본과 같음'): '※ 재구성' 줄이 붙고 원본에 있는 결과처럼 보이지 않게 함.
+    그림 속 축, 범례, 단위가 읽히는 크기여야 하므로 칸이 작으면 장을 나눔"""
+    extra = 0.24 + 0.17 + (0.17 if adapted else 0)
+    if h < extra + 1.0:
+        raise ValueError(f"source_figure 칸 높이 {h} in 가 작음: 그림 {h - extra:.2f} in 로는 축과 범례가 안 읽힘 (장을 나누거나 칸을 키움)")
+    screenshot(s, path, x, y, w, h - extra, marks)
+    pic = next(sh for sh in reversed(list(s.shapes)) if sh.shape_type == 13)
+    yb = (pic.top + pic.height) / _E + 0.04
+    figure_caption(s, title, x, yb, w)
+    lines = [f"출처: {source}"] + ([f"재구성: {adapted} (원본에 있는 결과가 아님)"] if adapted else [])
+    _obst(s, notes(s, pic.left / _E, yb + 0.22, max(pic.width / _E, 3.0), lines))   # 출처 줄은 그림 왼쪽 끝에 맞춤
+    return pic
+
+
 def marks_on(s, pic, marks, color=RED):
     """그림 위 영역 네모 및 번호"""
     px, py, pw, ph = pic.left / _E, pic.top / _E, pic.width / _E, pic.height / _E

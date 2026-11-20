@@ -142,6 +142,9 @@ def check(path):
                 warns.append(f"{i}쪽 명사 잇기 '{c}': 조사를 넣어 풀어 씀")
             if len(ln) > long_ln:
                 warns.append(f"{i}쪽 {len(ln)}자 문장: 두 줄로 나누거나 줄임: {ln[:40]}...")
+        for ln in lines:   # 다시 그린 도식은 원본이 무엇인지 같이 적음 (원본과 혼동 방지)
+            if "재구성" in ln and "원본" not in ln:
+                warns.append(f"{i}쪽 '재구성' 줄에 원본이 없음: '원본 ○○ 그림 3 을 단순화' 처럼 무엇을 바꿨는지 적음")
         note = notes_of(s)
         for ln in (x.strip(" •※-") for x in (ok(note) if ok else note).split("\n") if x.strip()):
             for pats, out in ((NOTE_FAIL, fails), (WARN, warns)):

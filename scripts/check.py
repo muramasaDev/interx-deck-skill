@@ -315,6 +315,26 @@ if _purpose == "영업":   # 첫 본문 장은 회사 소개가 아니라 변화
 _min = re.match(r"ix-minutes:([\d.]+)", _prs.core_properties.content_status or "")
 if _min and len(main) > float(_min.group(1)) / 1.5:
     print(f"주의: 본문 {len(main)}장이 발표 {_min.group(1)}분 기준 {float(_min.group(1)) / 1.5:.0f}장(1.5분당 1장)을 넘음")
+# 그림 도형: 원본 가로세로 비율이 찌그러지거나(4% 넘음) 가장자리가 많이 잘린(한 변 5% 넘음) 그림은 축, 범례, 단위가 가려지거나 왜곡됨
+for _sl in _all:
+    for _sh in _sl.shapes:
+        if _sh.shape_type != 13 or _sh.height is None or not _sh.height:
+            continue
+        try:
+            _pw, _ph = _sh.image.size
+        except Exception:
+            continue
+        _kw, _kh = 1 - _sh.crop_left - _sh.crop_right, 1 - _sh.crop_top - _sh.crop_bottom
+        if _kw <= 0.05 or _kh <= 0.05 or not (_pw and _ph):
+            bad.append(f"slide{_all.index(_sl) + 1}: 그림 '{_sh.name}' 의 자르기 값이 비정상")
+            continue
+        _want, _got = (_pw * _kw) / (_ph * _kh), _sh.width / _sh.height
+        if abs(_got / _want - 1) > 0.04:
+            bad.append(f"slide{_all.index(_sl) + 1}: 그림 '{_sh.name}' 가로세로 비율이 원본과 {abs(_got / _want - 1) * 100:.0f}% 다름 (찌그러짐): "
+                       f"한 변만 줄이지 말고 비율을 지킴")
+        _cr = max(_sh.crop_left, _sh.crop_right, _sh.crop_top, _sh.crop_bottom)
+        if _cr > 0.05:
+            print(f"주의: slide{_all.index(_sl) + 1} 그림 '{_sh.name}' 가장자리를 {_cr * 100:.0f}% 자름: 축, 범례, 단위, 캡션이 잘리지 않았는지 확인")
 SPEECH_CPM = 330   # 한국어 발표 속도 추정: 공백을 뺀 글자 수 / 분 (추정치이며 발표자마다 다름)
 _cs = _prs.core_properties.content_status or ""
 _notes = [re.sub(r"\s", "", sl.notes_slide.notes_text_frame.text) if sl.has_notes_slide and sl.notes_slide.notes_text_frame is not None else ""
